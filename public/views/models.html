@@ -126,7 +126,7 @@
                             <span x-text="$store.global.t('stat')">Stat</span>
                         </div>
                     </th>
-                    <th class="whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group"
+                    <th class="min-w-[14rem] whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group align-middle"
                         @click="$store.data.setSort('modelId')">
                         <div class="flex items-center gap-1">
                             <span x-text="$store.global.t('modelIdentity')">Model Identity</span>
@@ -138,7 +138,7 @@
                             </svg>
                         </div>
                     </th>
-                    <th class="min-w-[12rem] whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group"
+                    <th class="min-w-[32rem] whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group align-middle"
                         @click="$store.data.setSort('avgQuota')">
                         <div class="flex items-center gap-1">
                             <span x-text="$store.global.t('globalQuota')">Global Quota</span>
@@ -151,9 +151,9 @@
                         </div>
                     </th>
                     <th x-show="!$store.settings.compact"
-                        class="min-w-[8rem] whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group"
+                        class="min-w-[10.5rem] whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group text-center align-middle"
                         @click="$store.data.setSort('minResetTime')">
-                        <div class="flex items-center gap-1">
+                        <div class="flex items-center justify-center gap-1">
                             <span x-text="$store.global.t('nextReset')">Next Reset</span>
                             <svg class="w-3 h-3 transition-colors"
                                 :class="$store.data.filters.sortCol === 'minResetTime' ? 'text-neon-purple' : 'text-gray-700 opacity-0 group-hover:opacity-100'"
@@ -164,9 +164,9 @@
                         </div>
                     </th>
                     <th x-show="!$store.settings.compact"
-                        class="whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group"
+                        class="whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group text-center align-middle"
                         @click="$store.data.setSort('activeCount')">
-                        <div class="flex items-center gap-1 justify-start">
+                        <div class="flex items-center justify-center gap-1">
                             <span x-text="$store.global.t('distribution')">Account Distribution</span>
                             <svg class="w-3 h-3 transition-colors"
                                 :class="$store.data.filters.sortCol === 'activeCount' ? 'text-neon-purple' : 'text-gray-700 opacity-0 group-hover:opacity-100'"
@@ -176,152 +176,201 @@
                             </svg>
                         </div>
                     </th>
-                    <th class="w-20 !pr-4 text-right whitespace-nowrap" x-text="$store.global.t('actions')">Actions
+                    <th class="w-20 !pr-4 text-center align-middle whitespace-nowrap" x-text="$store.global.t('actions')">Actions
                     </th>
                 </tr>
             </thead>
             <tbody class="text-sm">
                 <template x-for="row in $store.data.quotaRows" :key="row.modelId">
-                    <tr class="group transition-all duration-300" :class="row.hidden ? 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0 bg-space-900/50' : ''">
-                        <td class="!pl-4">
-                            <div class="w-2 h-2 rounded-full transition-all duration-500"
+                    <tr class="group transition-all duration-300 align-middle" :class="row.hidden ? 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0 bg-space-900/50' : ''">
+                        <td class="text-center align-middle !pl-4">
+                            <div class="mx-auto w-2 h-2 rounded-full transition-all duration-500"
                                 :class="row.avgQuota > 0 ? 'bg-neon-green shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'">
                             </div>
                         </td>
-                        <td>
-                            <div class="font-bold text-gray-200 group-hover:text-neon-purple transition-colors"
-                                :class="$store.settings.compact ? 'text-xs' : ''"
-                                x-text="row.modelId"></div>
-                            <div class="text-[10px] font-mono text-gray-500 uppercase"
-                                x-show="!$store.settings.compact"
-                                x-text="$store.global.t('family' + row.family.charAt(0).toUpperCase() + row.family.slice(1))">
+                        <td class="align-middle whitespace-nowrap">
+                            <div class="flex flex-col justify-center">
+                                <div class="font-bold text-gray-200 group-hover:text-neon-purple transition-colors"
+                                    :class="$store.settings.compact ? 'text-xs' : ''"
+                                    x-text="row.modelId"></div>
+                                <div class="text-[10px] font-mono text-gray-500 uppercase leading-tight mt-0.5"
+                                    x-show="!$store.settings.compact"
+                                    x-text="$store.global.t('family' + row.family.charAt(0).toUpperCase() + row.family.slice(1))">
+                                </div>
                             </div>
                         </td>
-                        <td>
-                            <div class="flex flex-col pr-4"
-                                 :class="$store.settings.compact ? 'gap-0.5' : 'gap-1'">
-                                <div class="flex justify-between text-xs font-mono">
-                                    <span class="flex items-center gap-1.5">
-                                        <span x-text="row.avgQuota + '%'"
-                                            :class="row.avgQuota > 0 ? 'text-white' : 'text-red-500'"></span>
-                                        <!-- Threshold indicator (inline) -->
-                                        <span x-show="row.effectiveThresholdPct > 0"
-                                              class="text-[10px] text-gray-500"
-                                              x-text="row.hasVariedThresholds && row.quotaInfo.some(q => q.thresholdPct > 0)
-                                                  ? '· min ' + Math.min(...row.quotaInfo.map(q => q.thresholdPct).filter(t => t > 0)) + '–' + row.effectiveThresholdPct + '%'
-                                                  : '· min ' + row.effectiveThresholdPct + '%'"></span>
-                                        <!-- Inline reset time (compact only) -->
-                                        <span x-show="$store.settings.compact && row.resetIn && row.resetIn !== '-'"
-                                              class="text-[10px]"
-                                              :class="row.resetIn.indexOf('h') === -1 ? 'text-neon-purple' : 'text-gray-500'"
-                                              x-text="'· ' + row.resetIn"></span>
-                                    </span>
-                                    <span class="flex items-center gap-2">
-                                        <!-- Compact: inline account squares -->
-                                        <span x-show="$store.settings.compact && row.quotaInfo && row.quotaInfo.length > 0"
-                                              class="inline-flex gap-0.5 items-center">
-                                            <template x-for="q in row.quotaInfo.slice(0, 8)" :key="q.fullEmail + '-sq'">
-                                                <span class="w-1.5 h-1.5 rounded-sm inline-block"
-                                                      :class="q.pct > 50 ? 'bg-neon-green/80' : (q.pct > 0 ? 'bg-yellow-500/80' : 'bg-red-900/60')"></span>
-                                            </template>
-                                            <span x-show="row.quotaInfo.length > 8"
-                                                  class="text-[8px] text-gray-600 leading-none"
-                                                  x-text="'+' + (row.quotaInfo.length - 8)"></span>
+                        <td class="align-middle">
+                            <div class="flex flex-col pr-4" :class="$store.settings.compact ? 'gap-0.5' : 'gap-2'">
+                                <!-- Compact Mode Inline -->
+                                <div x-show="$store.settings.compact" class="flex flex-col gap-0.5">
+                                    <div class="flex justify-between text-xs font-mono">
+                                        <span class="flex items-center gap-1.5">
+                                            <span x-text="row.avgQuota + '%'" :class="row.avgQuota > 0 ? 'text-white' : 'text-red-500'"></span>
+                                            <span x-show="row.avgWeeklyQuota !== null" class="text-neon-cyan/90 text-[10px]" x-text="'· W:' + row.avgWeeklyQuota + '%'"></span>
+                                            <span x-show="row.resetIn && row.resetIn !== '-'" class="text-[10px] text-gray-500" x-text="'· 5H:' + row.resetIn"></span>
+                                            <span x-show="row.weeklyResetIn && row.weeklyResetIn !== '-'" class="text-[10px] text-neon-cyan/80" x-text="'· W:' + row.weeklyResetIn"></span>
                                         </span>
-                                        <!-- Available/Total Accounts Indicator -->
-                                        <span class="text-gray-500 text-[10px]"
-                                              x-text="row.quotaInfo.filter(q => q.pct > 0).length + '/' + row.quotaInfo.length"></span>
-                                    </span>
-                                </div>
-                                <div class="relative">
-                                    <progress class="progress w-full bg-space-800"
-                                        :class="[
-                                            $store.settings.compact ? 'h-1' : 'h-1.5',
-                                            row.avgQuota > 50 ? 'progress-gradient-success' : (row.avgQuota > 0 ? 'progress-gradient-warning' : 'progress-gradient-error')
-                                        ]"
+                                        <span class="text-gray-500 text-[10px]" x-text="row.quotaInfo.filter(q => q.pct > 0).length + '/' + row.quotaInfo.length"></span>
+                                    </div>
+                                    <progress class="progress w-full bg-space-800 h-1"
+                                        :class="row.avgQuota > 50 ? 'progress-gradient-success' : (row.avgQuota > 0 ? 'progress-gradient-warning' : 'progress-gradient-error')"
                                         :value="row.avgQuota" max="100"></progress>
-                                    <!-- Per-account draggable quota threshold markers -->
-                                    <template x-for="(q, qIdx) in row.quotaInfo.filter(q => q.thresholdPct > 0 || isDragging(q, row))" :key="q.fullEmail + '-threshold'">
-                                        <div class="absolute -top-1 -bottom-1 group/marker"
-                                             :class="isDragging(q, row) ? 'cursor-grabbing z-30' : 'cursor-grab'"
-                                             :style="'left: calc(' + getMarkerPct(q, row) + '% - 4px); width: 9px; transform: translateX(' + (isDragging(q, row) ? '0px' : getMarkerOffset(q, row, qIdx)) + ');'"
-                                             :title="Redact.email(q.email) + ' min: ' + getMarkerPct(q, row) + '%'"
-                                             @mousedown.prevent="startDrag($event, q, row)"
-                                             @touchstart.prevent="startDrag($event, q, row)">
-                                            <!-- Visible marker line -->
-                                            <div class="absolute top-1 bottom-1 left-1 w-[3px] rounded-full"
-                                                 :class="isDragging(q, row) ? 'scale-y-150 brightness-150' : 'transition-all group-hover/marker:scale-y-150 group-hover/marker:brightness-125'"
-                                                 :style="'background-color: ' + getThresholdColor(qIdx).bg + '; box-shadow: 0 0 ' + (isDragging(q, row) ? '10px' : '6px') + ' ' + getThresholdColor(qIdx).shadow"></div>
-                                            <!-- Tooltip popup (visible on hover or during drag) -->
-                                            <div class="absolute -top-8 left-1/2 -translate-x-1/2 items-center gap-1.5
-                                                         whitespace-nowrap text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-space-900 border border-space-border shadow-xl shadow-black/40 z-20"
-                                                 :class="isDragging(q, row) ? 'flex' : 'hidden group-hover/marker:flex'"
-                                                 :style="'color: ' + getThresholdColor(qIdx).bg + '; border-color: ' + getThresholdColor(qIdx).bg + '40'">
-                                                <span class="w-2 h-2 rounded-full flex-shrink-0" :style="'background-color: ' + getThresholdColor(qIdx).bg"></span>
-                                                <span x-text="Redact.email(q.email)"></span>
-                                                <span class="text-gray-500">min</span>
-                                                <span x-text="getMarkerPct(q, row) + '%'"></span>
-                                            </div>
-                                        </div>
-                                    </template>
                                 </div>
-                                <!-- Per-account breakdown (non-compact only) -->
-                                <div x-show="!$store.settings.compact && row.quotaInfo && row.quotaInfo.length > 1"
-                                     class="flex flex-col gap-1 mt-1 pt-1 border-t border-space-border/30">
-                                    <template x-for="q in getVisibleAccounts(row)" :key="q.fullEmail + '-detail'">
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-[10px] font-mono text-gray-500 w-20 truncate text-right flex-shrink-0"
-                                                  x-text="Redact.email(q.email)"></span>
-                                            <div class="flex-1 h-1 rounded-full bg-space-800 overflow-hidden">
+
+                                <!-- Non-Compact Mode (Design Scheme 1: Dual-Track Progress Bars) -->
+                                <div x-show="!$store.settings.compact" class="space-y-2 max-w-2xl">
+                                    <!-- 5H Track -->
+                                    <div class="space-y-0.5">
+                                        <div class="flex justify-between items-center font-mono text-[11px]">
+                                            <span class="flex items-center gap-1.5">
+                                                <span class="w-5 h-4 flex items-center justify-center rounded bg-space-800 border border-space-border text-gray-400 text-[9px] font-bold flex-shrink-0">5H</span>
+                                                <span class="text-white font-semibold flex items-center gap-1">
+                                                    <span class="inline-block w-8 text-left tabular-nums" x-text="row.avgQuota + '%'"></span>
+                                                    <span class="text-gray-500 font-normal text-[10px]">剩余</span>
+                                                </span>
+                                            </span>
+                                            <span class="text-gray-400 text-[10px]"
+                                                  x-text="row.quotaInfo.length + '/' + row.quotaInfo.length + ' 账号' + (row.minQuota < row.avgQuota ? ' (最低 ' + row.minQuota + '%)' : '')"></span>
+                                        </div>
+                                        <div class="relative">
+                                            <div class="w-full h-1.5 rounded-full bg-space-800 overflow-hidden">
                                                 <div class="h-full rounded-full transition-all duration-500"
-                                                     :class="q.pct > 50 ? 'bg-neon-green/70' : (q.pct > 0 ? 'bg-yellow-500/70' : 'bg-red-500/50')"
-                                                     :style="'width: ' + q.pct + '%'"></div>
+                                                     :class="row.avgQuota > 50 ? 'bg-neon-green' : (row.avgQuota > 0 ? 'bg-yellow-500' : 'bg-red-500')"
+                                                     :style="'width: ' + row.avgQuota + '%'"></div>
                                             </div>
-                                            <span class="text-[10px] font-mono w-8 text-right flex-shrink-0"
-                                                  :class="q.pct > 0 ? 'text-gray-400' : 'text-red-500/70'"
-                                                  x-text="q.pct + '%'"></span>
-                                            <span x-show="q.resetTime"
-                                                  class="text-[9px] font-mono text-gray-600 w-12 text-right flex-shrink-0"
-                                                  x-text="window.utils.formatTimeUntil(q.resetTime)"></span>
+                                            <!-- Draggable threshold markers -->
+                                            <template x-for="(q, qIdx) in row.quotaInfo.filter(q => q.thresholdPct > 0 || isDragging(q, row))" :key="q.fullEmail + '-threshold'">
+                                                <div class="absolute -top-1 -bottom-1 group/marker"
+                                                     :class="isDragging(q, row) ? 'cursor-grabbing z-30' : 'cursor-grab'"
+                                                     :style="'left: calc(' + getMarkerPct(q, row) + '% - 4px); width: 9px; transform: translateX(' + (isDragging(q, row) ? '0px' : getMarkerOffset(q, row, qIdx)) + ');'"
+                                                     :title="Redact.email(q.email) + ' min: ' + getMarkerPct(q, row) + '%'"
+                                                     @mousedown.prevent="startDrag($event, q, row)"
+                                                     @touchstart.prevent="startDrag($event, q, row)">
+                                                    <div class="absolute top-1 bottom-1 left-1 w-[3px] rounded-full"
+                                                         :class="isDragging(q, row) ? 'scale-y-150 brightness-150' : 'transition-all group-hover/marker:scale-y-150 group-hover/marker:brightness-125'"
+                                                         :style="'background-color: ' + getThresholdColor(qIdx).bg + '; box-shadow: 0 0 ' + (isDragging(q, row) ? '10px' : '6px') + ' ' + getThresholdColor(qIdx).shadow"></div>
+                                                </div>
+                                            </template>
                                         </div>
-                                    </template>
-                                    <!-- "+N more" expand button -->
-                                    <button x-show="getHiddenCount(row) > 0"
-                                            @click="toggleExpanded(row.modelId)"
-                                            class="text-[10px] font-mono text-neon-purple/70 hover:text-neon-purple transition-colors text-left pl-[88px] py-0.5 cursor-pointer"
-                                            x-text="'+' + getHiddenCount(row) + ' more'"></button>
-                                    <!-- "Show less" collapse button -->
-                                    <button x-show="isExpanded(row.modelId) && !$store.settings.showAllAccounts && row.quotaInfo.length > window.AppConstants.LIMITS.ACCOUNT_BREAKDOWN_LIMIT"
-                                            @click="toggleExpanded(row.modelId)"
-                                            class="text-[10px] font-mono text-gray-500 hover:text-gray-300 transition-colors text-left pl-[88px] py-0.5 cursor-pointer">Show less</button>
-                                </div>
-                            </div>
-                        </td>
-                        <td x-show="!$store.settings.compact" class="font-mono text-xs">
-                            <div class="tooltip tooltip-left"
-                                 :data-tip="row.quotaInfo && row.quotaInfo.length > 0 ? row.quotaInfo.filter(q => q.resetTime).map(q => Redact.email(q.email) + ': ' + q.resetTime).join('\n') : 'No reset data'">
-                                <span x-text="row.resetIn"
-                                    :class="(row.resetIn && row.resetIn.indexOf('h') === -1 && row.resetIn !== '-') ? 'text-neon-purple font-bold' : 'text-gray-400'"></span>
-                            </div>
-                        </td>
-                        <td x-show="!$store.settings.compact">
-                            <div class="flex items-center justify-start gap-3">
-                                <div class="text-[10px] font-mono text-gray-500 hidden xl:block text-left leading-tight opacity-70">
-                                    <div
-                                        x-text="$store.global.t('activeCount', {count: row.quotaInfo?.filter(q => q.pct > 0).length || 0})">
+                                    </div>
+
+                                    <!-- Weekly Track -->
+                                    <div x-show="row.avgWeeklyQuota !== null" class="space-y-0.5">
+                                        <div class="flex justify-between items-center font-mono text-[11px]">
+                                            <span class="flex items-center gap-1.5">
+                                                <span class="w-5 h-4 flex items-center justify-center rounded bg-neon-cyan/20 border border-neon-cyan/30 text-neon-cyan text-[9px] font-bold flex-shrink-0">W</span>
+                                                <span class="text-neon-cyan font-semibold flex items-center gap-1">
+                                                    <span class="inline-block w-8 text-left tabular-nums" x-text="row.avgWeeklyQuota + '%'"></span>
+                                                    <span class="text-neon-cyan/60 font-normal text-[10px]">剩余</span>
+                                                </span>
+                                            </span>
+                                            <span class="text-gray-500 text-[10px]">本周平均已消耗 <span class="text-gray-300 font-semibold" x-text="(row.avgWeeklyUsedPct ?? 0) + '%'"></span></span>
+                                        </div>
+                                        <div class="w-full h-1.5 rounded-full bg-space-800 overflow-hidden">
+                                            <div class="h-full rounded-full bg-gradient-to-r from-cyan-600 to-neon-cyan transition-all duration-500"
+                                                 :style="'width: ' + (row.avgWeeklyQuota || 0) + '%'"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Multi-account Breakdown -->
+                                    <div x-show="!$store.settings.compact && row.quotaInfo && row.quotaInfo.length > 1"
+                                         class="pt-2 mt-2 border-t border-space-border/50 space-y-1.5">
+                                        <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between pb-0.5">
+                                            <span x-text="row.quotaInfo.length + ' 个账号逐账号明细:'"></span>
+                                            <span class="text-neon-cyan/80 text-[9px]">双轨独立核算</span>
+                                        </div>
+                                        <template x-for="q in getVisibleAccounts(row)" :key="q.fullEmail + '-detail'">
+                                            <div class="flex items-center text-[10px] font-mono text-gray-400">
+                                                <!-- 1. Account Name: fixed width -->
+                                                <span class="w-24 truncate text-gray-300 text-left flex-shrink-0" x-text="Redact.email(q.email)"></span>
+
+                                                <!-- 2. Dual Bars: flexible space with min-width -->
+                                                <div class="flex-1 mx-3 flex gap-2 items-center min-w-[8rem]">
+                                                    <div class="flex-1 h-1.5 bg-space-800 rounded-full overflow-hidden" :title="'5H: ' + q.pct + '%'">
+                                                        <div class="h-full rounded-full transition-all duration-500"
+                                                             :class="q.pct > 50 ? 'bg-neon-green' : (q.pct > 0 ? 'bg-amber-400' : 'bg-red-500/60')"
+                                                             :style="'width: ' + q.pct + '%'"></div>
+                                                    </div>
+                                                    <div x-show="q.weeklyPct !== null && q.weeklyPct !== undefined"
+                                                         class="flex-1 h-1.5 bg-space-800 rounded-full overflow-hidden" :title="'W: ' + q.weeklyPct + '%'">
+                                                        <div class="h-full rounded-full bg-neon-cyan transition-all duration-500"
+                                                             :style="'width: ' + q.weeklyPct + '%'"></div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- 3. Percentages: fixed width text-right -->
+                                                <span class="w-28 text-right text-gray-300 flex-shrink-0 tabular-nums mr-2"
+                                                      x-text="'5H:' + q.pct + '%' + (q.weeklyPct !== null && q.weeklyPct !== undefined ? ' · W:' + q.weeklyPct + '%' : '')"></span>
+
+                                                <!-- 4. Badges Container: fixed width columns for perfect vertical alignment -->
+                                                <div class="flex items-center gap-1.5 text-[9px] flex-shrink-0 w-36 justify-end">
+                                                    <!-- 5H Badge: fixed width 68px -->
+                                                    <span x-show="q.resetTime"
+                                                          class="w-[68px] h-5 rounded bg-space-800 text-gray-300 border border-space-border/60 flex items-center justify-center gap-1 cursor-help flex-shrink-0"
+                                                          :title="'5H: ' + window.utils.formatTimeUntil(q.resetTime) + (window.utils.formatDateTime(q.resetTime) ? ' (' + window.utils.formatDateTime(q.resetTime) + ')' : '')">
+                                                        <span class="text-gray-400 font-bold">5H</span>
+                                                        <span x-text="window.utils.formatTimeUntil(q.resetTime)"></span>
+                                                    </span>
+                                                    <!-- W Badge: fixed width 76px -->
+                                                    <span x-show="q.weeklyResetTime"
+                                                          class="w-[76px] h-5 rounded bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/25 flex items-center justify-center gap-1 cursor-help flex-shrink-0"
+                                                          :title="'W: ' + window.utils.formatTimeUntil(q.weeklyResetTime) + (window.utils.formatDateTime(q.weeklyResetTime) ? ' (' + window.utils.formatDateTime(q.weeklyResetTime) + ')' : '')">
+                                                        <span class="font-bold text-neon-cyan">W</span>
+                                                        <span x-text="window.utils.formatTimeUntil(q.weeklyResetTime)"></span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <!-- "+N more" expand button -->
+                                        <button x-show="getHiddenCount(row) > 0"
+                                                @click="toggleExpanded(row.modelId)"
+                                                class="text-[10px] font-mono text-neon-purple/70 hover:text-neon-purple transition-colors text-left pl-[104px] py-0.5 cursor-pointer"
+                                                x-text="'+' + getHiddenCount(row) + ' more'"></button>
+                                        <!-- "Show less" collapse button -->
+                                        <button x-show="isExpanded(row.modelId) && !$store.settings.showAllAccounts && row.quotaInfo.length > window.AppConstants.LIMITS.ACCOUNT_BREAKDOWN_LIMIT"
+                                                @click="toggleExpanded(row.modelId)"
+                                                class="text-[10px] font-mono text-gray-500 hover:text-gray-300 transition-colors text-left pl-[104px] py-0.5 cursor-pointer">Show less</button>
                                     </div>
                                 </div>
+                            </div>
+                        </td>
+                        <td x-show="!$store.settings.compact" class="text-center align-middle font-mono text-xs">
+                            <div class="flex flex-col items-center justify-center gap-1.5 py-0.5">
+                                <!-- 5-Hour Limit Reset (Scheme 1: Dual Tech Badges) -->
+                                <div class="inline-flex items-center gap-2 px-2 py-0.5 rounded-md bg-space-850/90 border border-space-border hover:border-neon-purple/40 transition-colors w-fit tooltip tooltip-left cursor-help"
+                                     :data-tip="window.utils.formatResetTooltip(row.quotaInfo, '5h')">
+                                    <span class="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-neon-purple/20 text-neon-purple leading-none">5H</span>
+                                    <span class="text-xs font-mono font-semibold"
+                                          :class="(row.resetIn && !row.resetIn.includes('h') && !row.resetIn.includes('时') && row.resetIn !== '-' && row.resetIn !== 'READY' && row.resetIn !== '已就绪') ? 'text-neon-purple font-bold' : 'text-gray-200'"
+                                          x-text="row.resetIn"></span>
+                                    <span x-show="row.resetIn && row.resetIn !== '-' && row.resetIn !== 'READY' && row.resetIn !== '已就绪'"
+                                          class="w-1.5 h-1.5 rounded-full bg-neon-purple animate-pulse"></span>
+                                </div>
+                                <!-- Weekly Limit Reset (Scheme 1: Dual Tech Badges with W) -->
+                                <div x-show="row.weeklyResetIn && row.weeklyResetIn !== '-'"
+                                     class="inline-flex items-center gap-2 px-2 py-0.5 rounded-md bg-space-850/90 border border-space-border hover:border-neon-cyan/40 transition-colors w-fit tooltip tooltip-left cursor-help"
+                                     :data-tip="window.utils.formatResetTooltip(row.quotaInfo, 'weekly')">
+                                    <span class="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-neon-cyan/20 text-neon-cyan leading-none">W</span>
+                                    <span class="text-xs font-mono font-semibold text-neon-cyan/90" x-text="row.weeklyResetIn"></span>
+                                </div>
+                            </div>
+                        </td>
+                        <td x-show="!$store.settings.compact" class="text-center align-middle">
+                            <div class="flex flex-col items-center justify-center gap-1.5">
+                                <div class="text-[10px] font-mono text-gray-500 leading-tight opacity-70"
+                                    x-text="$store.global.t('activeCount', {count: row.quotaInfo?.filter(q => q.pct > 0).length || 0})">
+                                </div>
                                 <!-- Account Status Indicators -->
-                                <div class="flex flex-wrap gap-1 justify-start max-w-[200px]" x-data="{ maxVisible: 12 }">
+                                <div class="flex flex-wrap gap-1 justify-center max-w-[160px]" x-data="{ maxVisible: 12 }">
                                     <template x-if="!row.quotaInfo || row.quotaInfo.length === 0">
                                         <div class="text-[10px] text-gray-600 italic" x-text="$store.global.t('noData')">No data</div>
                                     </template>
                                     <template x-if="row.quotaInfo && row.quotaInfo.length > 0">
-                                        <div class="flex flex-wrap gap-1 justify-start">
+                                        <div class="flex flex-wrap gap-1 justify-center">
                                             <!-- Visible accounts (limited to maxVisible) -->
                                             <template x-for="(q, idx) in row.quotaInfo.slice(0, maxVisible)" :key="q.fullEmail">
                                                 <div class="tooltip tooltip-left"
-                                                     :data-tip="`${Redact.email(q.fullEmail)} (${q.pct}%)` + (q.thresholdPct > 0 ? ` · min: ${q.thresholdPct}%` : '')">
+                                                     :data-tip="`${Redact.email(q.fullEmail)} (5H:${q.pct}%` + (q.weeklyPct !== null && q.weeklyPct !== undefined ? ` · W:${q.weeklyPct}%)` : ')') + (q.thresholdPct > 0 ? ` · min: ${q.thresholdPct}%` : '')">
                                                     <div class="w-2.5 h-2.5 rounded-[2px] transition-all hover:scale-125 cursor-help"
                                                         :class="q.pct > 50 ? 'bg-neon-green opacity-80' : (q.pct > 0 ? 'bg-yellow-500 opacity-80' : 'bg-red-900 opacity-50')">
                                                     </div>
@@ -330,7 +379,7 @@
                                             <!-- Overflow indicator -->
                                             <template x-if="row.quotaInfo.length > maxVisible">
                                                 <div class="tooltip tooltip-left"
-                                                     :data-tip="row.quotaInfo.slice(maxVisible).map(q => `${Redact.email(q.fullEmail)} (${q.pct}%)` + (q.thresholdPct > 0 ? ` · min: ${q.thresholdPct}%` : '')).join('\n')">
+                                                     :data-tip="row.quotaInfo.slice(maxVisible).map(q => `${Redact.email(q.fullEmail)} (5H:${q.pct}%` + (q.weeklyPct !== null && q.weeklyPct !== undefined ? ` · W:${q.weeklyPct}%)` : ')') + (q.thresholdPct > 0 ? ` · min: ${q.thresholdPct}%` : '')).join('\n')">
                                                     <div class="w-2.5 h-2.5 rounded-[2px] bg-gray-700/50 border border-gray-600 flex items-center justify-center cursor-help hover:bg-gray-600/70 transition-colors">
                                                         <span class="text-[6px] text-gray-400 font-bold leading-none"
                                                               x-text="`+${row.quotaInfo.length - maxVisible}`"></span>
@@ -342,9 +391,8 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="text-right !pr-4">
-                            <div
-                                class="flex items-center justify-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                        <td class="text-center align-middle !pr-4">
+                            <div class="flex items-center justify-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
                                 <!-- Pin Toggle -->
                                 <button class="btn btn-xs btn-circle transition-colors"
                                     :class="row.pinned ? 'bg-neon-purple/20 text-neon-purple border-neon-purple/50 hover:bg-neon-purple/30' : 'btn-ghost text-gray-600 hover:text-gray-300'"

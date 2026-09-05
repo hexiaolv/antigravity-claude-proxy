@@ -9,6 +9,7 @@ import {
     ANTIGRAVITY_HEADERS,
     LOAD_CODE_ASSIST_ENDPOINTS,
     LOAD_CODE_ASSIST_HEADERS,
+    QUOTA_SUMMARY_ENDPOINTS,
     CLIENT_METADATA,
     getModelFamily,
     MODEL_VALIDATION_CACHE_TTL_MS
@@ -142,6 +143,46 @@ export async function getModelQuotas(token, projectId = null) {
     }
 
     return quotas;
+}
+
+/**
+ * Retrieve user quota summary (weekly and 5-hour limits per group)
+ * @param {string} token - OAuth access token
+ * @param {string} [projectId] - Optional project ID
+ * @returns {Promise<Object|null>} Quota summary object ({ groups, description }) or null
+ */
+export async function retrieveUserQuotaSummary(token, projectId = null) {
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...ANTIGRAVITY_HEADERS
+    };
+
+    const body = projectId ? { project: projectId } : {};
+
+    for (const endpoint of QUOTA_SUMMARY_ENDPOINTS) {
+        try {
+            const url = `${endpoint}/v1internal:retrieveUserQuotaSummary`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                continue;
+            }
+
+            const data = await response.json();
+            if (data && data.groups) {
+                return data;
+            }
+        } catch (error) {
+            // Try next endpoint
+        }
+    }
+
+    return null;
 }
 
 /**

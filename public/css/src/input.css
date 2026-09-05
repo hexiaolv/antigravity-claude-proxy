@@ -161,7 +161,15 @@
 
 /* Tooltip Customization */
 .tooltip:before {
-  @apply bg-space-800 border border-space-border text-gray-200 font-mono text-xs;
+  @apply bg-space-900/95 border border-space-border/80 text-gray-200 font-mono text-[11px] shadow-2xl;
+  text-align: left !important;
+  white-space: pre !important;
+  max-width: 45rem !important;
+  line-height: 1.6 !important;
+  padding: 0.5rem 0.85rem !important;
+  border-radius: 0.5rem !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .tooltip-left:before {

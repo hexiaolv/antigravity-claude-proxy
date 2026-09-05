@@ -239,6 +239,135 @@
             </div>
         </div>
     </div>
+
+    <!-- Quota Limits Card (Scheme 1: Dual-Column HUD, Placed Above Request Volume) -->
+    <div class="view-card space-y-5">
+        <!-- Card Header with Title & Account Switcher -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-space-border/40">
+            <div class="flex items-center gap-2.5 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    class="w-4 h-4 text-neon-purple flex-shrink-0">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="flex items-center gap-2 whitespace-nowrap">
+                    <h3 class="text-xs font-mono text-gray-400 uppercase tracking-widest whitespace-nowrap"
+                        x-text="$store.global.t('quotaCycle')">Quota Cycle</h3>
+                    <span class="text-[11px] font-mono text-gray-500 hidden sm:inline">· 5h & Weekly</span>
+                </div>
+            </div>
+
+            <!-- Account Switcher Pills (shown when multiple accounts exist) -->
+            <div class="flex flex-wrap items-center gap-2" x-show="quotaSummaryAccounts.length > 0">
+                <template x-for="acc in quotaSummaryAccounts" :key="acc.email">
+                    <button @click="selectQuotaEmail(acc.email)"
+                        class="px-2.5 py-1 rounded-lg text-xs font-mono flex items-center gap-2 transition-all border"
+                        :class="selectedQuotaEmail === acc.email
+                            ? 'bg-neon-purple/20 border-neon-purple text-white shadow-sm ring-1 ring-neon-purple/30'
+                            : 'bg-space-850/80 border-space-border/50 text-gray-400 hover:text-gray-200 hover:border-space-border'">
+                        <span class="w-1.5 h-1.5 rounded-full"
+                            :class="selectedQuotaEmail === acc.email ? 'bg-neon-purple' : 'bg-gray-500'"></span>
+                        <span x-text="acc.label" :title="acc.email" class="truncate max-w-[140px]"></span>
+                        <span x-show="acc.tier && acc.tier !== 'unknown'"
+                            class="text-[9px] px-1 py-0.2 rounded bg-space-800/80 text-gray-400 uppercase tracking-wider font-sans"
+                            x-text="acc.tier"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div x-show="!currentQuotaSummary || !currentQuotaSummary.groups || currentQuotaSummary.groups.length === 0"
+            class="py-8 flex flex-col items-center justify-center text-center">
+            <div class="text-xs font-mono text-gray-500" x-text="$store.global.t('noQuotaData')">No quota data available</div>
+        </div>
+
+        <!-- Dual-Column Grid (Gemini Models & Claude/GPT Models) -->
+        <div x-show="currentQuotaSummary && currentQuotaSummary.groups && currentQuotaSummary.groups.length > 0"
+            class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <template x-for="(group, gIdx) in (currentQuotaSummary?.groups || [])" :key="group.displayName || gIdx">
+                <div class="bg-space-900 border border-space-border/60 rounded-2xl p-4 sm:p-5 transition-all relative overflow-hidden group"
+                    :class="group.isGemini ? 'hover:border-neon-green/40' : 'hover:border-neon-purple/40'">
+                    <!-- Ambient subtle glow -->
+                    <div class="absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-20"
+                        :class="group.isGemini ? 'bg-neon-green' : 'bg-neon-purple'"></div>
+
+                    <!-- Group Card Header -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm border flex-shrink-0"
+                                :class="group.isGemini
+                                    ? 'bg-neon-green/10 border-neon-green/25 text-neon-green'
+                                    : 'bg-neon-purple/10 border-neon-purple/25 text-neon-purple'"
+                                x-text="group.iconLetter || 'M'"></div>
+                            <div>
+                                <h4 class="text-sm font-bold text-white flex items-center gap-1.5 leading-snug">
+                                    <span x-text="getGroupDisplayName(group)"></span>
+                                    <span class="text-[10px] text-gray-400 font-normal font-mono" x-text="group.subModels"></span>
+                                </h4>
+                                <p class="text-[11px] text-gray-400 leading-tight" x-text="getGroupDescription(group)"></p>
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border flex-shrink-0"
+                            :class="group.healthPct >= 60 ? 'bg-neon-green/15 text-neon-green border-neon-green/30' : (group.healthPct >= 25 ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-neon-red/15 text-neon-red border-neon-red/30')"
+                            x-text="getGroupHealthLabel(group)"></span>
+                    </div>
+
+                    <!-- Dual Metrics Sub-Tiles (5h & Weekly) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <!-- 5-Hour Burst Limit Tile -->
+                        <div class="p-3.5 rounded-xl bg-space-850/80 border border-space-border/40 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs text-gray-300 font-medium"
+                                        x-text="group.fiveHourBucket ? getBucketDisplayName(group.fiveHourBucket) : $store.global.t('fiveHourLimitRemaining')"></span>
+                                    <span class="text-xs font-bold font-mono"
+                                        :class="getProgressTextColor(group.fiveHourBucket?.pct ?? 100)"
+                                        x-text="(group.fiveHourBucket?.pct ?? 100) + '%'"></span>
+                                </div>
+                                <div class="w-full bg-space-950 h-2 rounded-full overflow-hidden mb-2.5">
+                                    <div class="h-full rounded-full transition-all duration-500"
+                                        :class="getProgressBarColor(group.fiveHourBucket?.pct ?? 100)"
+                                        :style="'width: ' + (group.fiveHourBucket?.pct ?? 100) + '%'"></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5 text-[11px] text-gray-400 font-mono mt-1">
+                                <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span class="truncate" :title="formatResetCountdownOnly(group.fiveHourBucket?.resetTime) || group.fiveHourBucket?.description" x-text="formatResetCountdownOnly(group.fiveHourBucket?.resetTime) || (group.fiveHourBucket?.description || '-')"></span>
+                            </div>
+                        </div>
+
+                        <!-- Weekly Limit Tile -->
+                        <div class="p-3.5 rounded-xl bg-space-850/80 border border-space-border/40 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs text-gray-300 font-medium"
+                                        x-text="group.weeklyBucket ? getBucketDisplayName(group.weeklyBucket) : $store.global.t('weeklyLimitRemaining')"></span>
+                                    <span class="text-xs font-bold font-mono"
+                                        :class="getProgressTextColor(group.weeklyBucket?.pct ?? 100)"
+                                        x-text="(group.weeklyBucket?.pct ?? 100) + '%'"></span>
+                                </div>
+                                <div class="w-full bg-space-950 h-2 rounded-full overflow-hidden mb-2.5">
+                                    <div class="h-full rounded-full transition-all duration-500"
+                                        :class="getProgressBarColor(group.weeklyBucket?.pct ?? 100)"
+                                        :style="'width: ' + (group.weeklyBucket?.pct ?? 100) + '%'"></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5 text-[11px] text-gray-400 font-mono mt-1">
+                                <svg class="w-3.5 h-3.5 text-neon-cyan flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                <span class="truncate" :title="formatResetCountdownOnly(group.weeklyBucket?.resetTime) || group.weeklyBucket?.description" x-text="formatResetCountdownOnly(group.weeklyBucket?.resetTime) || (group.weeklyBucket?.description || '-')"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
     <!-- Usage Trend Chart -->
     <div class="view-card">
         <!-- Header with Stats and Filter -->

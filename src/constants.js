@@ -97,6 +97,13 @@ export const ANTIGRAVITY_ENDPOINT_FALLBACKS = [
     ANTIGRAVITY_ENDPOINT_PROD
 ];
 
+// Endpoint fallback order for retrieveUserQuotaSummary (sandbox → daily → prod)
+export const QUOTA_SUMMARY_ENDPOINTS = [
+    'https://daily-cloudcode-pa.sandbox.googleapis.com',
+    'https://daily-cloudcode-pa.googleapis.com',
+    'https://cloudcode-pa.googleapis.com'
+];
+
 // Required headers for Antigravity API requests
 // Headers for general Antigravity API requests
 // Strictly matches the generic 'u' method in main.js

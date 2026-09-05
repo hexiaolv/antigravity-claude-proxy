@@ -274,7 +274,10 @@ document.addEventListener('alpine:init', () => {
                 let minQuota = 100;
                 let totalQuotaSum = 0;
                 let validAccountCount = 0;
+                let totalWeeklySum = 0;
+                let validWeeklyCount = 0;
                 let minResetTime = null;
+                let minWeeklyResetTime = null;
                 let maxEffectiveThreshold = 0;
                 const globalThreshold = this.globalQuotaThreshold || 0;
 
@@ -296,6 +299,19 @@ document.addEventListener('alpine:init', () => {
                         minResetTime = limit.resetTime;
                     }
 
+                    const weeklyInfo = this.getWeeklyQuotaInfo(acc, modelId);
+                    const weeklyResetTime = weeklyInfo?.resetTime || null;
+                    const weeklyPct = weeklyInfo?.pct ?? null;
+
+                    if (weeklyPct !== null) {
+                        totalWeeklySum += weeklyPct;
+                        validWeeklyCount++;
+                    }
+
+                    if (weeklyResetTime && (!minWeeklyResetTime || new Date(weeklyResetTime) < new Date(minWeeklyResetTime))) {
+                        minWeeklyResetTime = weeklyResetTime;
+                    }
+
                     // Resolve effective threshold: per-model > per-account > global
                     const accModelThreshold = acc.modelQuotaThresholds?.[modelId];
                     const accThreshold = acc.quotaThreshold;
@@ -313,7 +329,10 @@ document.addEventListener('alpine:init', () => {
                         email: acc.email.split('@')[0],
                         fullEmail: acc.email,
                         pct: pct,
+                        weeklyPct,
+                        weeklyUsedPct: weeklyPct !== null ? (100 - weeklyPct) : null,
                         resetTime: limit.resetTime,
+                        weeklyResetTime,
                         thresholdPct: Math.round(effective * 100),
                         thresholdSource
                     });
@@ -321,6 +340,8 @@ document.addEventListener('alpine:init', () => {
 
                 if (quotaInfo.length === 0) return;
                 const avgQuota = validAccountCount > 0 ? Math.round(totalQuotaSum / validAccountCount) : 0;
+                const avgWeeklyQuota = validWeeklyCount > 0 ? Math.round(totalWeeklySum / validWeeklyCount) : null;
+                const avgWeeklyUsedPct = avgWeeklyQuota !== null ? (100 - avgWeeklyQuota) : null;
 
                 if (!showExhausted && minQuota === 0) return;
 
@@ -334,8 +355,12 @@ document.addEventListener('alpine:init', () => {
                     family,
                     minQuota,
                     avgQuota, // Added Average Quota
+                    avgWeeklyQuota,
+                    avgWeeklyUsedPct,
                     minResetTime,
                     resetIn: minResetTime ? window.utils.formatTimeUntil(minResetTime) : '-',
+                    minWeeklyResetTime,
+                    weeklyResetIn: minWeeklyResetTime ? window.utils.formatTimeUntil(minWeeklyResetTime) : '-',
                     quotaInfo,
                     pinned: !!config.pinned,
                     hidden: !!isHidden, // Use computed visibility
@@ -387,10 +412,46 @@ document.addEventListener('alpine:init', () => {
         },
 
         getModelFamily(modelId) {
-            const lower = modelId.toLowerCase();
+            const lower = (modelId || '').toLowerCase();
             if (lower.includes('claude')) return 'claude';
             if (lower.includes('gemini')) return 'gemini';
             return 'other';
+        },
+
+        getWeeklyResetTime(acc, modelId) {
+            return this.getWeeklyQuotaInfo(acc, modelId)?.resetTime || null;
+        },
+
+        getWeeklyQuotaInfo(acc, modelId) {
+            if (!acc) return null;
+            const groups = acc.quotaSummary?.groups || acc.quota?.summary?.groups;
+            if (!groups || !Array.isArray(groups)) return null;
+
+            const lower = (modelId || '').toLowerCase();
+            const isClaudeOrGpt = lower.includes('claude') || lower.includes('gpt');
+
+            for (const group of groups) {
+                const gName = (group.displayName || '').toLowerCase();
+                const isClaudeGroup = gName.includes('claude') || gName.includes('gpt');
+                const isGeminiGroup = gName.includes('gemini');
+
+                if ((isClaudeOrGpt && isClaudeGroup) || (!isClaudeOrGpt && isGeminiGroup)) {
+                    const bucket = (group.buckets || []).find(b =>
+                        b.window === 'weekly' || (b.bucketId && b.bucketId.includes('weekly'))
+                    );
+                    if (bucket) {
+                        const fraction = typeof bucket.remainingFraction === 'number' ? bucket.remainingFraction : null;
+                        const pct = fraction !== null ? Math.round(fraction * 100) : null;
+                        return {
+                            remainingFraction: fraction,
+                            pct,
+                            usedPct: pct !== null ? (100 - pct) : null,
+                            resetTime: bucket.resetTime || null
+                        };
+                    }
+                }
+            }
+            return null;
         },
 
         /**

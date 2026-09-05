@@ -9,8 +9,12 @@ window.Components.dashboard = () => ({
     // Core state
     stats: { total: 0, active: 0, limited: 0, overallHealth: 0, hasTrendData: false },
     hasFilteredTrendData: true,
-    charts: { quotaDistribution: null, usageTrend: null },
+    charts: { quotaDistribution: null, usageTrend: null, quotaCycle: null },
     usageStats: { total: 0, today: 0, thisHour: 0 },
+    quotaCycle: [],
+    quotaSummaryAccounts: [],
+    selectedQuotaEmail: '',
+    currentQuotaSummary: null,
     historyData: {},
     modelTree: {},
     families: [],
@@ -28,12 +32,17 @@ window.Components.dashboard = () => ({
 
     // Debounced chart update to prevent rapid successive updates
     _debouncedUpdateTrendChart: null,
+    _debouncedUpdateQuotaCycle: null,
 
     init() {
         // Create debounced version of updateTrendChart (300ms delay for stability)
         this._debouncedUpdateTrendChart = window.utils.debounce(() => {
             window.DashboardCharts.updateTrendChart(this);
         }, 300);
+
+        this._debouncedUpdateQuotaCycle = window.utils.debounce(() => {
+            window.DashboardCharts.updateQuotaCycleChart(this);
+        }, 100);
 
         // Load saved preferences from localStorage
         window.DashboardFilters.loadPreferences(this);
@@ -48,6 +57,7 @@ window.Components.dashboard = () => ({
                     this.updateStats();
                     this.updateCharts();
                     this.updateTrendChart();
+                    this.updateQuotaCycle();
                     this.checkClaudeConfigStatus();
                 });
             }
@@ -57,6 +67,7 @@ window.Components.dashboard = () => ({
         this.$watch('$store.data.accounts', () => {
             if (this.$store.global.activeTab === 'dashboard') {
                 this.updateStats();
+                this.updateQuotaCycle();
                 // Debounce chart updates to prevent rapid flickering
                 if (this._debouncedUpdateCharts) {
                     this._debouncedUpdateCharts();
@@ -87,6 +98,7 @@ window.Components.dashboard = () => ({
             this.$nextTick(() => {
                 this.updateStats();
                 this.updateCharts();
+                this.updateQuotaCycle();
 
                 // Optimization: Only process history if it hasn't been processed yet
                 // The usageHistory watcher above will handle updates if data changes
@@ -161,6 +173,309 @@ window.Components.dashboard = () => ({
         this.updateTrendChart();
     },
 
+    processQuotaCycle() {
+        const accounts = Alpine.store('data')?.accounts || [];
+        const summaryAccounts = [];
+
+        accounts.forEach(acc => {
+            if (acc.enabled === false) return;
+
+            const email = acc.email || '';
+            const label = email.split('@')[0] || email;
+            const tier = acc.subscription?.tier || 'unknown';
+
+            let groups = [];
+
+            // Check if real quotaSummary from retrieveUserQuotaSummary is present
+            if (acc.quotaSummary && Array.isArray(acc.quotaSummary.groups) && acc.quotaSummary.groups.length > 0) {
+                groups = acc.quotaSummary.groups.map(g => {
+                    const buckets = (g.buckets || []).map(b => {
+                        const remainingFraction = b.remainingFraction ?? 0;
+                        const pct = Math.round(remainingFraction * 100);
+                        return {
+                            bucketId: b.bucketId || '',
+                            displayName: b.displayName || '',
+                            window: b.window || (b.bucketId?.includes('weekly') ? 'weekly' : '5h'),
+                            remainingFraction,
+                            pct,
+                            resetTime: b.resetTime || null,
+                            description: b.description || ''
+                        };
+                    });
+                    const fiveHourBucket = buckets.find(b => b.window === '5h' || b.bucketId.includes('5h')) || null;
+                    const weeklyBucket = buckets.find(b => b.window === 'weekly' || b.bucketId.includes('weekly')) || null;
+                    const healthPct = Math.min(fiveHourBucket?.pct ?? 100, weeklyBucket?.pct ?? 100);
+                    const isGemini = (g.displayName || '').toLowerCase().includes('gemini');
+                    const isClaude = (g.displayName || '').toLowerCase().includes('claude') || (g.displayName || '').toLowerCase().includes('gpt');
+
+                    return {
+                        displayName: g.displayName || '',
+                        description: g.description || '',
+                        buckets,
+                        fiveHourBucket,
+                        weeklyBucket,
+                        healthPct,
+                        isGemini,
+                        isClaude,
+                        iconLetter: isGemini ? 'G' : (isClaude ? 'C' : 'M'),
+                        subModels: isGemini ? 'Flash / Pro' : (isClaude ? 'Opus / Sonnet / OSS' : '')
+                    };
+                });
+            } else {
+                // Synthesize groups from model limits if retrieveUserQuotaSummary is unavailable
+                const geminiLimits = [];
+                const claudeLimits = [];
+                let geminiReset = null;
+                let claudeReset = null;
+
+                Object.entries(acc.limits || {}).forEach(([modelId, limit]) => {
+                    if (!limit || limit.remainingFraction === null || limit.remainingFraction === undefined) return;
+                    const isClaude = modelId.includes('claude') || modelId.includes('gpt');
+                    if (isClaude) {
+                        claudeLimits.push(limit.remainingFraction);
+                        if (limit.resetTime && (!claudeReset || new Date(limit.resetTime) < new Date(claudeReset))) {
+                            claudeReset = limit.resetTime;
+                        }
+                    } else if (modelId.includes('gemini')) {
+                        geminiLimits.push(limit.remainingFraction);
+                        if (limit.resetTime && (!geminiReset || new Date(limit.resetTime) < new Date(geminiReset))) {
+                            geminiReset = limit.resetTime;
+                        }
+                    }
+                });
+
+                const geminiAvg = geminiLimits.length > 0
+                    ? geminiLimits.reduce((a, b) => a + b, 0) / geminiLimits.length
+                    : 1.0;
+                const claudeAvg = claudeLimits.length > 0
+                    ? claudeLimits.reduce((a, b) => a + b, 0) / claudeLimits.length
+                    : 1.0;
+
+                const gemini5h = {
+                    bucketId: 'gemini-5h',
+                    displayName: 'Five Hour Limit Remaining',
+                    window: '5h',
+                    remainingFraction: geminiAvg,
+                    pct: Math.round(geminiAvg * 100),
+                    resetTime: geminiReset,
+                    description: ''
+                };
+                const geminiWeekly = {
+                    bucketId: 'gemini-weekly',
+                    displayName: 'Weekly Limit Remaining',
+                    window: 'weekly',
+                    remainingFraction: geminiAvg,
+                    pct: Math.round(geminiAvg * 100),
+                    resetTime: null,
+                    description: ''
+                };
+
+                const claude5h = {
+                    bucketId: '3p-5h',
+                    displayName: 'Five Hour Limit Remaining',
+                    window: '5h',
+                    remainingFraction: claudeAvg,
+                    pct: Math.round(claudeAvg * 100),
+                    resetTime: claudeReset,
+                    description: ''
+                };
+                const claudeWeekly = {
+                    bucketId: '3p-weekly',
+                    displayName: 'Weekly Limit Remaining',
+                    window: 'weekly',
+                    remainingFraction: claudeAvg,
+                    pct: Math.round(claudeAvg * 100),
+                    resetTime: null,
+                    description: ''
+                };
+
+                groups = [
+                    {
+                        displayName: 'Gemini Models',
+                        description: 'Models within this group: Gemini Flash, Gemini Pro',
+                        buckets: [geminiWeekly, gemini5h],
+                        fiveHourBucket: gemini5h,
+                        weeklyBucket: geminiWeekly,
+                        healthPct: Math.round(geminiAvg * 100),
+                        isGemini: true,
+                        isClaude: false,
+                        iconLetter: 'G',
+                        subModels: 'Flash / Pro'
+                    },
+                    {
+                        displayName: 'Claude and GPT models',
+                        description: 'Models within this group: Claude Opus, Claude Sonnet, GPT-OSS',
+                        buckets: [claudeWeekly, claude5h],
+                        fiveHourBucket: claude5h,
+                        weeklyBucket: claudeWeekly,
+                        healthPct: Math.round(claudeAvg * 100),
+                        isGemini: false,
+                        isClaude: true,
+                        iconLetter: 'C',
+                        subModels: 'Opus / Sonnet / OSS'
+                    }
+                ];
+            }
+
+            summaryAccounts.push({
+                email,
+                label,
+                tier,
+                groups
+            });
+        });
+
+        this.quotaSummaryAccounts = summaryAccounts;
+
+        // Maintain selection
+        if (!this.selectedQuotaEmail || !summaryAccounts.some(a => a.email === this.selectedQuotaEmail)) {
+            this.selectedQuotaEmail = summaryAccounts[0]?.email || '';
+        }
+
+        this.currentQuotaSummary = summaryAccounts.find(a => a.email === this.selectedQuotaEmail) || null;
+        return summaryAccounts;
+    },
+
+    selectQuotaEmail(email) {
+        this.selectedQuotaEmail = email;
+        this.currentQuotaSummary = this.quotaSummaryAccounts.find(a => a.email === email) || null;
+    },
+
+    getQuotaRingColor(pct) {
+        if (pct >= 60) return '#10b981'; // emerald-500
+        if (pct >= 25) return '#f59e0b'; // amber-500
+        return '#ef4444'; // rose-500
+    },
+
+    getGroupDisplayName(group) {
+        if (!group) return '';
+        const store = Alpine.store('global');
+        const name = group.displayName || '';
+        if (name.toLowerCase().includes('gemini')) return store ? store.t('geminiModels') : name;
+        if (name.toLowerCase().includes('claude') || name.toLowerCase().includes('gpt')) return store ? store.t('claudeGptModels') : name;
+        return name;
+    },
+
+    getGroupDescription(group) {
+        if (!group) return '';
+        const store = Alpine.store('global');
+        const name = group.displayName || '';
+        if (name.toLowerCase().includes('gemini')) return store ? store.t('geminiModelsDesc') : (group.description || '');
+        if (name.toLowerCase().includes('claude') || name.toLowerCase().includes('gpt')) return store ? store.t('claudeGptModelsDesc') : (group.description || '');
+        return group.description || '';
+    },
+
+    getBucketDisplayName(bucket) {
+        if (!bucket) return '';
+        const store = Alpine.store('global');
+        const name = bucket.displayName || '';
+        const window = bucket.window || '';
+        if (window === 'weekly' || name.toLowerCase().includes('weekly')) return store ? store.t('weeklyLimitRemaining') : name;
+        if (window === '5h' || name.toLowerCase().includes('five hour')) return store ? store.t('fiveHourLimitRemaining') : name;
+        return name;
+    },
+
+    formatQuotaDescription(bucket) {
+        if (!bucket) return '';
+        const store = Alpine.store('global');
+        const lang = store?.lang || 'en';
+        const isZh = lang === 'zh';
+        const pct = bucket.pct ?? 100;
+        const isWeekly = bucket.window === 'weekly' || (bucket.bucketId && bucket.bucketId.includes('weekly'));
+
+        let timeStr = '';
+        if (bucket.resetTime) {
+            const diff = new Date(bucket.resetTime) - new Date();
+            if (diff <= 0) {
+                return isZh ? '额度已完全重置就绪。' : 'Quota has fully refreshed and is ready to use.';
+            }
+            const mins = Math.floor(diff / 60000);
+            const hours = Math.floor(mins / 60);
+            const days = Math.floor(hours / 24);
+            const remHours = hours % 24;
+            const remMins = mins % 60;
+
+            if (isZh) {
+                if (days > 0) timeStr = `${days} 天 ${remHours} 小时`;
+                else if (hours > 0) timeStr = `${hours} 小时 ${remMins} 分钟`;
+                else timeStr = `${remMins} 分钟`;
+            } else {
+                if (days > 0) timeStr = `${days} day${days > 1 ? 's' : ''}, ${remHours} hour${remHours > 1 ? 's' : ''}`;
+                else if (hours > 0) timeStr = `${hours} hour${hours > 1 ? 's' : ''}, ${remMins} minute${remMins > 1 ? 's' : ''}`;
+                else timeStr = `${remMins} minute${remMins > 1 ? 's' : ''}`;
+            }
+        }
+
+        if (isZh) {
+            const limitName = isWeekly ? '周配额' : '5 小时配额';
+            if (pct >= 100) return `未消耗${limitName}，额度充足。`;
+            if (pct <= 0) return `${limitName}已耗尽${timeStr ? `，将在 ${timeStr} 后完全重置` : ''}。`;
+            return `您已消耗部分${limitName}${timeStr ? `，将在 ${timeStr} 后完全重置` : ''}。`;
+        }
+
+        // English / default
+        if (bucket.description && pct < 100 && pct > 0) {
+            return bucket.description;
+        }
+        const limitName = isWeekly ? 'weekly limit' : '5-hour limit';
+        if (pct >= 100) return `You have not used any of your ${limitName}.`;
+        if (pct <= 0) return `You have hit your ${limitName}${timeStr ? `, it will fully refresh in ${timeStr}` : ''}.`;
+        return `You have used some of your ${limitName}${timeStr ? `, it will fully refresh in ${timeStr}` : ''}.`;
+    },
+
+    formatResetCountdownOnly(resetTime) {
+        if (!resetTime) return '';
+        const store = Alpine.store('global');
+        const lang = store?.lang || 'en';
+        const isZh = lang === 'zh';
+        const diff = new Date(resetTime) - new Date();
+        if (diff <= 0) {
+            return isZh ? '已完全重置就绪' : 'Fully refreshed';
+        }
+        const mins = Math.floor(diff / 60000);
+        const hours = Math.floor(mins / 60);
+        const days = Math.floor(hours / 24);
+        const remHours = hours % 24;
+        const remMins = mins % 60;
+
+        let timeStr = '';
+        if (isZh) {
+            if (days > 0) timeStr = `${days} 天 ${remHours} 小时`;
+            else if (hours > 0) timeStr = `${hours} 小时 ${remMins} 分钟`;
+            else timeStr = `${remMins} 分钟`;
+            return `${timeStr}后完全重置`;
+        } else {
+            if (days > 0) timeStr = `${days} day${days > 1 ? 's' : ''}, ${remHours} hour${remHours > 1 ? 's' : ''}`;
+            else if (hours > 0) timeStr = `${hours} hour${hours > 1 ? 's' : ''}, ${remMins} minute${remMins > 1 ? 's' : ''}`;
+            else timeStr = `${remMins} minute${remMins > 1 ? 's' : ''}`;
+            return `Fully refreshes in ${timeStr}`;
+        }
+    },
+
+    getGroupHealthLabel(group) {
+        if (!group) return '';
+        const store = Alpine.store('global');
+        const isZh = store?.lang === 'zh';
+        const pct = group.healthPct ?? 100;
+        if (pct >= 80) return isZh ? `健康 ${pct}%` : `Healthy ${pct}%`;
+        if (pct >= 50) return isZh ? `充裕 ${pct}%` : `Good ${pct}%`;
+        if (pct >= 20) return isZh ? `中度使用 ${pct}%` : `Moderate ${pct}%`;
+        if (pct > 0) return isZh ? `吃紧 ${pct}%` : `Low ${pct}%`;
+        return isZh ? '已耗尽 0%' : 'Depleted 0%';
+    },
+
+    getProgressBarColor(pct) {
+        if (pct >= 60) return 'bg-neon-green';
+        if (pct >= 25) return 'bg-amber-400';
+        return 'bg-neon-red';
+    },
+
+    getProgressTextColor(pct) {
+        if (pct >= 60) return 'text-neon-green';
+        if (pct >= 25) return 'text-amber-400';
+        return 'text-neon-red';
+    },
+
     // Delegation methods for stats
     updateStats() {
         window.DashboardStats.updateStats(this);
@@ -169,6 +484,15 @@ window.Components.dashboard = () => ({
     // Delegation methods for charts
     updateCharts() {
         window.DashboardCharts.updateCharts(this);
+    },
+
+    updateQuotaCycle() {
+        this.processQuotaCycle();
+        if (this._debouncedUpdateQuotaCycle) {
+            this._debouncedUpdateQuotaCycle();
+        } else if (window.DashboardCharts && window.DashboardCharts.updateQuotaCycleChart) {
+            window.DashboardCharts.updateQuotaCycleChart(this);
+        }
     },
 
     updateTrendChart() {

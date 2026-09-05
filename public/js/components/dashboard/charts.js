@@ -588,3 +588,12 @@ window.DashboardCharts.updateTrendChart = function (component) {
     _trendChartUpdateLock = false;
   }
 };
+
+/**
+ * Quota cycle updates - no-op since quota groups render via native SVG in Alpine template
+ * @param {object} component - Dashboard component instance
+ */
+window.DashboardCharts.updateQuotaCycleChart = function (component) {
+  // SVG rings and cards are rendered reactively by Alpine
+};
+

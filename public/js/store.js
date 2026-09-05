@@ -106,6 +106,10 @@ document.addEventListener('alpine:init', () => {
         setLang(l) {
             this.lang = l;
             localStorage.setItem('app_lang', l);
+            const dataStore = Alpine.store('data');
+            if (dataStore && dataStore.computeQuotaRows) {
+                dataStore.computeQuotaRows();
+            }
         },
 
         showToast(message, type = 'info') {

@@ -8,7 +8,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { sendMessage, sendMessageStream, listModels, getModelQuotas, getSubscriptionTier, isValidModel } from './cloudcode/index.js';
+import { sendMessage, sendMessageStream, listModels, getModelQuotas, getSubscriptionTier, isValidModel, retrieveUserQuotaSummary } from './cloudcode/index.js';
 import { mountWebUI } from './webui/index.js';
 import { config } from './config.js';
 
@@ -370,8 +370,11 @@ app.get('/account-limits', async (req, res) => {
                     // Fetch subscription tier first to get project ID
                     const subscription = await getSubscriptionTier(token);
 
-                    // Then fetch quotas with project ID for accurate quota info
-                    const quotas = await getModelQuotas(token, subscription.projectId);
+                    // Then fetch model quotas and user quota summary in parallel
+                    const [quotas, quotaSummary] = await Promise.all([
+                        getModelQuotas(token, subscription.projectId),
+                        retrieveUserQuotaSummary(token, subscription.projectId).catch(() => null)
+                    ]);
 
                     // Update account object with fresh data
                     account.subscription = {
@@ -381,6 +384,7 @@ app.get('/account-limits', async (req, res) => {
                     };
                     account.quota = {
                         models: quotas,
+                        summary: quotaSummary,
                         lastChecked: Date.now()
                     };
 
@@ -393,7 +397,8 @@ app.get('/account-limits', async (req, res) => {
                         email: account.email,
                         status: 'ok',
                         subscription: account.subscription,
-                        models: quotas
+                        models: quotas,
+                        quotaSummary
                     };
                 } catch (error) {
                     // Detect ToS ban from quota/subscription fetch and mark account invalid
@@ -592,6 +597,8 @@ app.get('/account-limits', async (req, res) => {
                     modelQuotaThresholds: metadata.modelQuotaThresholds || {},
                     // Subscription data (new)
                     subscription: acc.subscription || metadata.subscription || { tier: 'unknown', projectId: null },
+                    // Quota summary (weekly + 5h limits from retrieveUserQuotaSummary)
+                    quotaSummary: acc.quotaSummary || metadata.quota?.summary || null,
                     // Quota limits
                     limits: Object.fromEntries(
                         sortedModels.map(modelId => {
