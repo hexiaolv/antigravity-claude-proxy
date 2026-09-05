@@ -92,10 +92,17 @@ function cleanupPidFile() {
 }
 
 /**
- * Get current port from environment or default
+ * Get current port from environment, config, or default
  */
 function getPort() {
-  return process.env.PORT || 8080;
+  if (process.env.PORT) return process.env.PORT;
+  try {
+    const config = JSON.parse(readFileSync(join(CONFIG_DIR, 'config.json'), 'utf-8'));
+    if (config && config.port) return config.port;
+  } catch (e) {
+    // Ignore - fall back to default
+  }
+  return 8080;
 }
 
 /**

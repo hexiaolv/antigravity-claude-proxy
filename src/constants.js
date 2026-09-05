@@ -204,6 +204,9 @@ export const STRATEGY_LABELS = {
 // Gemini-specific limits
 export const GEMINI_MAX_OUTPUT_TOKENS = 16384;
 
+// Claude-specific limits (Cloud Code backend rejects maxOutputTokens above this)
+export const CLAUDE_MAX_OUTPUT_TOKENS = 64000;
+
 // Gemini signature handling
 // Sentinel value to skip thought signature validation when Claude Code strips the field
 // See: https://ai.google.dev/gemini-api/docs/thought-signatures
@@ -507,6 +510,7 @@ export default {
     CAPACITY_JITTER_MAX_MS,
     MIN_SIGNATURE_LENGTH,
     GEMINI_MAX_OUTPUT_TOKENS,
+    CLAUDE_MAX_OUTPUT_TOKENS,
     GEMINI_SKIP_SIGNATURE,
     GEMINI_SIGNATURE_CACHE_TTL_MS,
     MODEL_VALIDATION_CACHE_TTL_MS,
