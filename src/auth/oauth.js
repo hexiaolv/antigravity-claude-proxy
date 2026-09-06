@@ -368,7 +368,7 @@ export async function exchangeCode(code, verifier) {
             grant_type: 'authorization_code',
             redirect_uri: OAUTH_REDIRECT_URI
         })
-    });
+    }, 15000);
 
     if (!response.ok) {
         const error = await response.text();
@@ -414,7 +414,7 @@ export async function refreshAccessToken(compositeRefresh) {
             refresh_token: parts.refreshToken,  // Use the actual OAuth token
             grant_type: 'refresh_token'
         })
-    });
+    }, 10000);
 
     if (!response.ok) {
         const error = await response.text();
@@ -439,7 +439,7 @@ export async function getUserEmail(accessToken) {
         headers: {
             'Authorization': `Bearer ${accessToken}`
         }
-    });
+    }, 10000);
 
     if (!response.ok) {
         const errorText = await response.text();
@@ -472,7 +472,7 @@ export async function discoverProjectId(accessToken) {
                 body: JSON.stringify({
                     metadata: CLIENT_METADATA
                 })
-            });
+            }, 10000);
 
             if (!response.ok) continue;
 

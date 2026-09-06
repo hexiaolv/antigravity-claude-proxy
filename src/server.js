@@ -339,6 +339,87 @@ app.get('/health', async (req, res) => {
     }
 });
 
+// In-flight deduplication for /account-limits to prevent request stampedes
+let accountLimitsInFlight = null;
+
+async function fetchAccountLimitsData(allAccounts) {
+    return Promise.allSettled(
+        allAccounts.map(async (account) => {
+            // Skip invalid accounts
+            if (account.isInvalid) {
+                return {
+                    email: account.email,
+                    status: 'invalid',
+                    error: account.invalidReason,
+                    models: {}
+                };
+            }
+
+            try {
+                const token = await accountManager.getTokenForAccount(account);
+
+                // Fetch subscription tier first to get project ID
+                const subscription = await getSubscriptionTier(token);
+
+                // Then fetch model quotas and user quota summary in parallel
+                const [quotas, quotaSummary] = await Promise.all([
+                    getModelQuotas(token, subscription.projectId),
+                    retrieveUserQuotaSummary(token, subscription.projectId).catch(() => null)
+                ]);
+
+                // Update account object with fresh data
+                account.subscription = {
+                    tier: subscription.tier,
+                    projectId: subscription.projectId,
+                    detectedAt: Date.now()
+                };
+                account.quota = {
+                    models: quotas,
+                    summary: quotaSummary,
+                    lastChecked: Date.now()
+                };
+
+                // Save updated account data to disk (async, don't wait)
+                accountManager.saveToDisk().catch(err => {
+                    logger.error('[Server] Failed to save account data:', err);
+                });
+
+                return {
+                    email: account.email,
+                    status: 'ok',
+                    subscription: account.subscription,
+                    models: quotas,
+                    quotaSummary
+                };
+            } catch (error) {
+                // Detect ToS ban from quota/subscription fetch and mark account invalid
+                if (error.message?.startsWith('ACCOUNT_BANNED:')) {
+                    accountManager.markInvalid(account.email, 'Account banned — Gemini disabled for Terms of Service violation');
+                    return {
+                        email: account.email,
+                        status: 'banned',
+                        error: 'Account banned — Gemini disabled for Terms of Service violation',
+                        subscription: account.subscription || { tier: 'unknown', projectId: null },
+                        models: {}
+                    };
+                }
+
+                logger.warn(`[Server] Failed to fetch quota for ${account.email}: ${error.message}`);
+
+                // Graceful fallback: return existing cached quota if available rather than empty models
+                return {
+                    email: account.email,
+                    status: account.quota?.models ? 'ok' : 'error',
+                    error: error.message,
+                    subscription: account.subscription || { tier: 'unknown', projectId: null },
+                    models: account.quota?.models || {},
+                    quotaSummary: account.quota?.summary || null
+                };
+            }
+        })
+    );
+}
+
 /**
  * Account limits endpoint - fetch quota/limits for all accounts × all models
  * Returns a table showing remaining quota and reset time for each combination
@@ -351,77 +432,13 @@ app.get('/account-limits', async (req, res) => {
         const format = req.query.format || 'json';
         const includeHistory = req.query.includeHistory === 'true';
 
-        // Fetch quotas for each account in parallel
-        const results = await Promise.allSettled(
-            allAccounts.map(async (account) => {
-                // Skip invalid accounts
-                if (account.isInvalid) {
-                    return {
-                        email: account.email,
-                        status: 'invalid',
-                        error: account.invalidReason,
-                        models: {}
-                    };
-                }
-
-                try {
-                    const token = await accountManager.getTokenForAccount(account);
-
-                    // Fetch subscription tier first to get project ID
-                    const subscription = await getSubscriptionTier(token);
-
-                    // Then fetch model quotas and user quota summary in parallel
-                    const [quotas, quotaSummary] = await Promise.all([
-                        getModelQuotas(token, subscription.projectId),
-                        retrieveUserQuotaSummary(token, subscription.projectId).catch(() => null)
-                    ]);
-
-                    // Update account object with fresh data
-                    account.subscription = {
-                        tier: subscription.tier,
-                        projectId: subscription.projectId,
-                        detectedAt: Date.now()
-                    };
-                    account.quota = {
-                        models: quotas,
-                        summary: quotaSummary,
-                        lastChecked: Date.now()
-                    };
-
-                    // Save updated account data to disk (async, don't wait)
-                    accountManager.saveToDisk().catch(err => {
-                        logger.error('[Server] Failed to save account data:', err);
-                    });
-
-                    return {
-                        email: account.email,
-                        status: 'ok',
-                        subscription: account.subscription,
-                        models: quotas,
-                        quotaSummary
-                    };
-                } catch (error) {
-                    // Detect ToS ban from quota/subscription fetch and mark account invalid
-                    if (error.message?.startsWith('ACCOUNT_BANNED:')) {
-                        accountManager.markInvalid(account.email, 'Account banned — Gemini disabled for Terms of Service violation');
-                        return {
-                            email: account.email,
-                            status: 'banned',
-                            error: 'Account banned — Gemini disabled for Terms of Service violation',
-                            subscription: account.subscription || { tier: 'unknown', projectId: null },
-                            models: {}
-                        };
-                    }
-                    return {
-                        email: account.email,
-                        status: 'error',
-                        error: error.message,
-                        subscription: account.subscription || { tier: 'unknown', projectId: null },
-                        models: {}
-                    };
-                }
-            })
-        );
+        // Fetch quotas for each account in parallel with in-flight deduplication
+        if (!accountLimitsInFlight) {
+            accountLimitsInFlight = fetchAccountLimitsData(allAccounts).finally(() => {
+                accountLimitsInFlight = null;
+            });
+        }
+        const results = await accountLimitsInFlight;
 
         // Process results
         const accountLimits = results.map((result, index) => {

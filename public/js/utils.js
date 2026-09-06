@@ -3,32 +3,44 @@
  */
 
 window.utils = {
-    // Shared Request Wrapper
-    async request(url, options = {}, webuiPassword = '') {
+    // Shared Request Wrapper with timeout protection
+    async request(url, options = {}, webuiPassword = '', timeoutMs = 15000) {
         options.headers = options.headers || {};
         if (webuiPassword) {
             options.headers['x-webui-password'] = webuiPassword;
         }
 
-        let response = await fetch(url, options);
-
-        if (response.status === 401) {
-            const store = Alpine.store('global');
-            const password = prompt(store ? store.t('enterPassword') : 'Enter Web UI Password:');
-            if (password) {
-                // Return new password so caller can update state
-                // This implies we need a way to propagate the new password back
-                // For simplicity in this functional utility, we might need a callback or state access
-                // But generally utils shouldn't probably depend on global state directly if possible
-                // let's stick to the current logic but wrapped
-                localStorage.setItem('antigravity_webui_password', password);
-                options.headers['x-webui-password'] = password;
-                response = await fetch(url, options);
-                return { response, newPassword: password };
-            }
+        // Add timeout protection if not already provided to prevent zombie connections from exhausting browser pool
+        let timeoutId = null;
+        let controller = null;
+        if (!options.signal && timeoutMs > 0) {
+            controller = new AbortController();
+            timeoutId = setTimeout(() => {
+                controller.abort(new Error(`Request timed out after ${timeoutMs}ms: ${url}`));
+            }, timeoutMs);
+            options.signal = controller.signal;
         }
 
-        return { response, newPassword: null };
+        try {
+            let response = await fetch(url, options);
+
+            if (response.status === 401) {
+                const store = Alpine.store('global');
+                const password = prompt(store ? store.t('enterPassword') : 'Enter Web UI Password:');
+                if (password) {
+                    localStorage.setItem('antigravity_webui_password', password);
+                    options.headers['x-webui-password'] = password;
+                    response = await fetch(url, options);
+                    return { response, newPassword: password };
+                }
+            }
+
+            return { response, newPassword: null };
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        }
     },
 
     formatTimeUntil(isoTime) {

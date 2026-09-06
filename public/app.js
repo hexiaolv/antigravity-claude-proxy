@@ -104,6 +104,19 @@ document.addEventListener('alpine:init', () => {
             this.startAutoRefresh();
             document.addEventListener('refresh-interval-changed', () => this.startAutoRefresh());
 
+            // Pause polling during tab hidden/system sleep, resume cleanly on wake
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    if (this.refreshTimer) {
+                        clearInterval(this.refreshTimer);
+                        this.refreshTimer = null;
+                    }
+                } else {
+                    this.startAutoRefresh();
+                    Alpine.store('data').fetchData();
+                }
+            });
+
             // Initial Fetch
             Alpine.store('data').fetchData();
         },

@@ -8,7 +8,7 @@
  * entry point (src/index.js) before any fetch calls are made.
  */
 
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { ProxyAgent, Agent, setGlobalDispatcher } from 'undici';
 import { logger } from './logger.js';
 
 /**
@@ -22,11 +22,32 @@ export function initProxy() {
         process.env.HTTPS_PROXY;
 
     if (!proxyUrl) {
+        try {
+            // Configure default dispatcher with reasonable timeouts so zombie connections
+            // following system sleep/wake are cleanly reconnected
+            const defaultAgent = new Agent({
+                connect: {
+                    timeout: 10000
+                },
+                keepAliveTimeout: 10000,
+                keepAliveMaxTimeout: 30000
+            });
+            setGlobalDispatcher(defaultAgent);
+        } catch (error) {
+            logger.debug(`[Dispatcher] Default dispatcher initialization: ${error.message}`);
+        }
         return;
     }
 
     try {
-        const proxyAgent = new ProxyAgent(proxyUrl);
+        const proxyAgent = new ProxyAgent({
+            uri: proxyUrl,
+            connect: {
+                timeout: 10000
+            },
+            keepAliveTimeout: 10000,
+            keepAliveMaxTimeout: 30000
+        });
         setGlobalDispatcher(proxyAgent);
         logger.info(`[Proxy] Using proxy: ${proxyUrl}`);
     } catch (error) {

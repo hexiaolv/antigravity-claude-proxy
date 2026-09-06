@@ -108,7 +108,14 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        _isFetching: false,
         async fetchData() {
+            // Prevent concurrent/overlapping fetch operations from exhausting browser connection slots
+            if (this._isFetching) {
+                return;
+            }
+            this._isFetching = true;
+
             // Only show skeleton on initial load if we didn't restore from cache
             if (this.initialLoad) {
                 this.loading = true;
@@ -119,7 +126,7 @@ document.addEventListener('alpine:init', () => {
 
                 // Include history for dashboard (single API call optimization)
                 const url = '/account-limits?includeHistory=true';
-                const { response, newPassword } = await window.utils.request(url, {}, password);
+                const { response, newPassword } = await window.utils.request(url, {}, password, 15000);
 
                 if (newPassword) Alpine.store('global').webuiPassword = newPassword;
 
@@ -164,18 +171,24 @@ document.addEventListener('alpine:init', () => {
                 const store = Alpine.store('global');
                 store.showToast(store.t('connectionLost'), 'error');
             } finally {
+                this._isFetching = false;
                 this.loading = false;
                 this.initialLoad = false; // Mark initial load as complete
             }
         },
 
+        _isHealthChecking: false,
         async performHealthCheck() {
+            if (this._isHealthChecking) {
+                return;
+            }
+            this._isHealthChecking = true;
             try {
                 // Get password from global store
                 const password = Alpine.store('global').webuiPassword;
 
-                // Use lightweight endpoint (no quota fetching)
-                const { response, newPassword } = await window.utils.request('/api/config', {}, password);
+                // Use lightweight endpoint (no quota fetching) with 8s timeout
+                const { response, newPassword } = await window.utils.request('/api/config', {}, password, 8000);
 
                 if (newPassword) Alpine.store('global').webuiPassword = newPassword;
 
@@ -194,6 +207,8 @@ document.addEventListener('alpine:init', () => {
             } catch (error) {
                 console.error('Health check error:', error);
                 this.connectionStatus = 'disconnected';
+            } finally {
+                this._isHealthChecking = false;
             }
         },
 

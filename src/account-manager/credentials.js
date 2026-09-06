@@ -236,7 +236,7 @@ export async function discoverProject(token, projectId = undefined) {
                     ...LOAD_CODE_ASSIST_HEADERS
                 },
                 body: JSON.stringify({ metadata, mode: 1 })
-            });
+            }, 10000);
 
             if (!response.ok) {
                 const errorText = await response.text();

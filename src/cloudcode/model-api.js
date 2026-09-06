@@ -73,9 +73,10 @@ export async function listModels(token) {
  *
  * @param {string} token - OAuth access token
  * @param {string} [projectId] - Optional project ID for accurate quota info
+ * @param {number} [timeoutMs=10000] - Request timeout in milliseconds
  * @returns {Promise<Object>} Raw response from fetchAvailableModels API
  */
-export async function fetchAvailableModels(token, projectId = null) {
+export async function fetchAvailableModels(token, projectId = null, timeoutMs = 10000) {
     const headers = {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -92,7 +93,7 @@ export async function fetchAvailableModels(token, projectId = null) {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(body)
-            });
+            }, timeoutMs);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -122,10 +123,11 @@ export async function fetchAvailableModels(token, projectId = null) {
  *
  * @param {string} token - OAuth access token
  * @param {string} [projectId] - Optional project ID for accurate quota info
+ * @param {number} [timeoutMs=10000] - Request timeout in milliseconds
  * @returns {Promise<Object>} Map of modelId -> { remainingFraction, resetTime }
  */
-export async function getModelQuotas(token, projectId = null) {
-    const data = await fetchAvailableModels(token, projectId);
+export async function getModelQuotas(token, projectId = null, timeoutMs = 10000) {
+    const data = await fetchAvailableModels(token, projectId, timeoutMs);
     if (!data || !data.models) return {};
 
     const quotas = {};
@@ -149,9 +151,10 @@ export async function getModelQuotas(token, projectId = null) {
  * Retrieve user quota summary (weekly and 5-hour limits per group)
  * @param {string} token - OAuth access token
  * @param {string} [projectId] - Optional project ID
+ * @param {number} [timeoutMs=8000] - Request timeout in milliseconds
  * @returns {Promise<Object|null>} Quota summary object ({ groups, description }) or null
  */
-export async function retrieveUserQuotaSummary(token, projectId = null) {
+export async function retrieveUserQuotaSummary(token, projectId = null, timeoutMs = 8000) {
     const headers = {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -163,11 +166,11 @@ export async function retrieveUserQuotaSummary(token, projectId = null) {
     for (const endpoint of QUOTA_SUMMARY_ENDPOINTS) {
         try {
             const url = `${endpoint}/v1internal:retrieveUserQuotaSummary`;
-            const response = await fetch(url, {
+            const response = await throttledFetch(url, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(body)
-            });
+            }, timeoutMs);
 
             if (!response.ok) {
                 continue;
@@ -215,9 +218,10 @@ export function parseTierId(tierId) {
  * Calls loadCodeAssist API to discover project ID and subscription tier
  *
  * @param {string} token - OAuth access token
+ * @param {number} [timeoutMs=10000] - Request timeout in milliseconds
  * @returns {Promise<{tier: string, projectId: string|null}>} Subscription tier (free/pro/ultra) and project ID
  */
-export async function getSubscriptionTier(token) {
+export async function getSubscriptionTier(token, timeoutMs = 10000) {
     const headers = {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -234,7 +238,7 @@ export async function getSubscriptionTier(token) {
                     metadata: CLIENT_METADATA,
                     mode: 1
                 })
-            });
+            }, timeoutMs);
 
             if (!response.ok) {
                 const errorText = await response.text().catch(() => '');

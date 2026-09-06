@@ -61,32 +61,92 @@ export function sleep(ms) {
  * @returns {boolean} True if it is a network error
  */
 export function isNetworkError(error) {
-    const msg = error.message.toLowerCase();
+    if (!error) return false;
+    const msg = (error.message || '').toLowerCase();
+    const name = (error.name || '').toLowerCase();
+    const code = (error.code || '').toLowerCase();
     return (
         msg.includes('fetch failed') ||
         msg.includes('network error') ||
         msg.includes('econnreset') ||
         msg.includes('etimedout') ||
         msg.includes('socket hang up') ||
-        msg.includes('timeout')
+        msg.includes('timeout') ||
+        msg.includes('timed out') ||
+        msg.includes('abort') ||
+        msg.includes('econnrefused') ||
+        name === 'aborterror' ||
+        name === 'timeouterror' ||
+        code === 'und_err_connect_timeout' ||
+        code === 'und_err_headers_timeout' ||
+        code === 'und_err_body_timeout' ||
+        code === 'econnreset' ||
+        code === 'etimedout'
     );
 }
 
 /**
- * Throttled fetch that applies a configurable delay before each request
+ * Throttled fetch that applies a configurable delay and optional timeout
  * Only applies delay when requestThrottlingEnabled is true
  * @param {string|URL} url - The URL to fetch
- * @param {RequestInit} [options] - Fetch options
+ * @param {RequestInit} [options={}] - Fetch options
+ * @param {number|null} [timeoutMs=null] - Optional timeout in milliseconds
  * @returns {Promise<Response>} Fetch response
  */
-export async function throttledFetch(url, options) {
+export async function throttledFetch(url, options = {}, timeoutMs = null) {
     if (config.requestThrottlingEnabled) {
         const delayMs = config.requestDelayMs || 200;
         if (delayMs > 0) {
             await sleep(delayMs);
         }
     }
-    return fetch(url, options);
+
+    const timeout = timeoutMs ?? options?.timeoutMs ?? options?.timeout;
+    if (!timeout || timeout <= 0) {
+        return fetch(url, options);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        controller.abort(new Error(`Request timed out after ${timeout}ms: ${url}`));
+    }, timeout);
+
+    let onExternalAbort = null;
+    if (options.signal) {
+        if (options.signal.aborted) {
+            clearTimeout(timeoutId);
+            controller.abort(options.signal.reason);
+        } else {
+            onExternalAbort = () => {
+                clearTimeout(timeoutId);
+                controller.abort(options.signal.reason);
+            };
+            options.signal.addEventListener('abort', onExternalAbort, { once: true });
+        }
+    }
+
+    try {
+        const fetchOptions = { ...options, signal: controller.signal };
+        delete fetchOptions.timeout;
+        delete fetchOptions.timeoutMs;
+        return await fetch(url, fetchOptions);
+    } finally {
+        clearTimeout(timeoutId);
+        if (options.signal && onExternalAbort) {
+            options.signal.removeEventListener('abort', onExternalAbort);
+        }
+    }
+}
+
+/**
+ * Fetch with an enforced timeout (default 10s)
+ * @param {string|URL} url - The URL to fetch
+ * @param {RequestInit} [options={}] - Fetch options
+ * @param {number} [timeoutMs=10000] - Timeout in milliseconds
+ * @returns {Promise<Response>} Fetch response
+ */
+export async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+    return throttledFetch(url, options, timeoutMs);
 }
 
 /**

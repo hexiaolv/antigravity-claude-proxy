@@ -64,8 +64,18 @@ window.Components.logsViewer = () => ({
         this.$watch('filters', () => { if(this.isAutoScroll) this.$nextTick(() => this.scrollToBottom()) });
     },
 
+    reconnectTimer: null,
+
     startLogStream() {
-        if (this.eventSource) this.eventSource.close();
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = null;
+        }
 
         const password = Alpine.store('global').webuiPassword;
         const url = password
@@ -94,7 +104,18 @@ window.Components.logsViewer = () => ({
 
         this.eventSource.onerror = () => {
             if (window.UILogger) window.UILogger.debug('Log stream disconnected, reconnecting...');
-            setTimeout(() => this.startLogStream(), 3000);
+            if (this.eventSource) {
+                this.eventSource.close();
+                this.eventSource = null;
+            }
+            if (!this.reconnectTimer) {
+                this.reconnectTimer = setTimeout(() => {
+                    this.reconnectTimer = null;
+                    if (!document.hidden) {
+                        this.startLogStream();
+                    }
+                }, 3000);
+            }
         };
     },
 

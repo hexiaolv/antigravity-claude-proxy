@@ -72,7 +72,7 @@ export async function onboardUser(token, tierId, projectId = undefined, maxAttem
                         ...ANTIGRAVITY_HEADERS
                     },
                     body: JSON.stringify(requestBody)
-                });
+                }, 10000);
 
                 if (!response.ok) {
                     const errorText = await response.text();
