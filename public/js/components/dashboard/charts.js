@@ -143,32 +143,6 @@ window.DashboardCharts.updateCharts = function (component) {
     return;
   }
 
-  // FORCE DESTROY: Check for existing chart on the canvas element property
-  // This handles cases where Component state is lost but DOM persists
-  if (canvas._chartInstance) {
-    console.debug("Destroying existing quota chart from canvas property");
-    try {
-        canvas._chartInstance.destroy();
-    } catch(e) { if (window.UILogger) window.UILogger.debug(e); }
-    canvas._chartInstance = null;
-  }
-  
-  // Also check component state as backup
-  if (component.charts.quotaDistribution) {
-     try {
-         component.charts.quotaDistribution.destroy();
-     } catch(e) { }
-     component.charts.quotaDistribution = null;
-  }
-  
-  // Also try Chart.js registry
-  if (typeof Chart !== "undefined" && Chart.getChart) {
-      const regChart = Chart.getChart(canvas);
-      if (regChart) {
-          try { regChart.destroy(); } catch(e) {}
-      }
-  }
-
   if (typeof Chart === "undefined") {
     if (window.UILogger) window.UILogger.warn("Chart.js not loaded");
     return;
@@ -267,6 +241,34 @@ window.DashboardCharts.updateCharts = function (component) {
     labels.push(depletedLabel);
   });
 
+  // IN-PLACE REUSE: Reuse existing chart instance if available
+  const existingChart = canvas._chartInstance || (typeof Chart !== "undefined" && Chart.getChart ? Chart.getChart(canvas) : null);
+  if (existingChart && existingChart.config?.type === "doughnut") {
+    existingChart.data.labels = labels;
+    existingChart.data.datasets[0].data = data;
+    existingChart.data.datasets[0].backgroundColor = colors;
+    existingChart.update("none");
+    canvas._chartInstance = existingChart;
+    component.charts.quotaDistribution = existingChart;
+    return;
+  }
+
+  // FORCE DESTROY: Clean up before creating new chart
+  if (canvas._chartInstance) {
+    try { canvas._chartInstance.destroy(); } catch(e) { }
+    canvas._chartInstance = null;
+  }
+  if (component.charts.quotaDistribution) {
+    try { component.charts.quotaDistribution.destroy(); } catch(e) { }
+    component.charts.quotaDistribution = null;
+  }
+  if (typeof Chart !== "undefined" && Chart.getChart) {
+    const regChart = Chart.getChart(canvas);
+    if (regChart) {
+      try { regChart.destroy(); } catch(e) {}
+    }
+  }
+
   // Create Chart
   try {
     const newChart = new Chart(canvas, {
@@ -302,11 +304,11 @@ window.DashboardCharts.updateCharts = function (component) {
          },
        },
     });
-    
+
     // SAVE INSTANCE TO CANVAS AND COMPONENT
     canvas._chartInstance = newChart;
     component.charts.quotaDistribution = newChart;
-    
+
   } catch (e) {
     console.error("Failed to create quota chart:", e);
   }
@@ -328,35 +330,6 @@ window.DashboardCharts.updateTrendChart = function (component) {
   logger.debug("[updateTrendChart] Starting update...");
 
   const canvas = document.getElementById("usageTrendChart");
-  
-  // FORCE DESTROY: Check for existing chart on the canvas element property
-  if (canvas) {
-      if (canvas._chartInstance) {
-        console.debug("Destroying existing trend chart from canvas property");
-        try {
-            canvas._chartInstance.stop();
-            canvas._chartInstance.destroy();
-        } catch(e) { if (window.UILogger) window.UILogger.debug(e); }
-        canvas._chartInstance = null;
-      }
-      
-      // Also try Chart.js registry
-      if (typeof Chart !== "undefined" && Chart.getChart) {
-          const regChart = Chart.getChart(canvas);
-          if (regChart) {
-              try { regChart.stop(); regChart.destroy(); } catch(e) {}
-          }
-      }
-  }
-
-  // Also check component state
-  if (component.charts.usageTrend) {
-    try {
-      component.charts.usageTrend.stop();
-      component.charts.usageTrend.destroy();
-    } catch (e) { }
-    component.charts.usageTrend = null;
-  }
 
   // Safety checks
   if (!canvas) {
@@ -370,14 +343,6 @@ window.DashboardCharts.updateTrendChart = function (component) {
     return;
   }
 
-  if (window.UILogger) window.UILogger.debug("[updateTrendChart] Canvas element:", {
-    exists: !!canvas,
-    isConnected: canvas.isConnected,
-    width: canvas.offsetWidth,
-    height: canvas.offsetHeight,
-    parentElement: canvas.parentElement?.tagName,
-  });
-
   if (!isCanvasReady(canvas)) {
     if (window.UILogger) window.UILogger.debug("[updateTrendChart] Canvas not ready", {
       isConnected: canvas.isConnected,
@@ -387,20 +352,6 @@ window.DashboardCharts.updateTrendChart = function (component) {
     _trendChartUpdateLock = false;
     return;
   }
-
-  // Clear canvas to ensure clean state after destroy
-  try {
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  } catch (e) {
-    if (window.UILogger) window.UILogger.debug("[updateTrendChart] Failed to clear canvas:", e.message);
-  }
-
-  if (window.UILogger) window.UILogger.debug(
-    "[updateTrendChart] Canvas is ready, proceeding with chart creation"
-  );
 
   // Use filtered history data based on time range
   const history = window.DashboardFilters.getFilteredHistoryData(component);
@@ -518,6 +469,50 @@ window.DashboardCharts.updateTrendChart = function (component) {
     });
   }
 
+  // IN-PLACE REUSE: Update datasets directly if chart instance already exists
+  const existingChart = canvas._chartInstance || (typeof Chart !== "undefined" && Chart.getChart ? Chart.getChart(canvas) : null);
+  if (existingChart && existingChart.config?.type === "line") {
+    existingChart.data.labels = labels;
+    existingChart.data.datasets = datasets;
+    existingChart.update("none");
+    canvas._chartInstance = existingChart;
+    component.charts.usageTrend = existingChart;
+    _trendChartUpdateLock = false;
+    return;
+  }
+
+  // FORCE DESTROY: Only destroy when creating fresh chart instance
+  if (canvas._chartInstance) {
+    try {
+        canvas._chartInstance.stop();
+        canvas._chartInstance.destroy();
+    } catch(e) { if (window.UILogger) window.UILogger.debug(e); }
+    canvas._chartInstance = null;
+  }
+  if (typeof Chart !== "undefined" && Chart.getChart) {
+    const regChart = Chart.getChart(canvas);
+    if (regChart) {
+      try { regChart.stop(); regChart.destroy(); } catch(e) {}
+    }
+  }
+  if (component.charts.usageTrend) {
+    try {
+      component.charts.usageTrend.stop();
+      component.charts.usageTrend.destroy();
+    } catch (e) { }
+    component.charts.usageTrend = null;
+  }
+
+  // Clear canvas to ensure clean state after destroy
+  try {
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  } catch (e) {
+    if (window.UILogger) window.UILogger.debug("[updateTrendChart] Failed to clear canvas:", e.message);
+  }
+
   try {
     const newChart = new Chart(canvas, {
       type: "line",
@@ -576,7 +571,7 @@ window.DashboardCharts.updateTrendChart = function (component) {
         },
       },
     });
-    
+
     // SAVE INSTANCE
     canvas._chartInstance = newChart;
     component.charts.usageTrend = newChart;

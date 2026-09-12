@@ -4,6 +4,8 @@
  */
 window.Components = window.Components || {};
 
+let _logIdCounter = 0;
+
 window.Components.logsViewer = () => ({
     logs: [],
     isAutoScroll: true,
@@ -16,6 +18,9 @@ window.Components.logsViewer = () => ({
         SUCCESS: true,
         DEBUG: false
     },
+    _incomingBuffer: [],
+    _flushTimer: null,
+    _visibilityHandler: null,
 
     get filteredLogs() {
         const query = this.searchQuery.trim();
@@ -44,7 +49,32 @@ window.Components.logsViewer = () => ({
     },
 
     init() {
-        this.startLogStream();
+        // Only start stream if logs tab is active on initial load
+        if (Alpine.store('global')?.activeTab === 'logs' && !document.hidden) {
+            this.startLogStream();
+        }
+
+        // Start/stop stream on tab change (prevents background SSE and DOM churn)
+        this.$watch('$store.global.activeTab', (val) => {
+            if (val === 'logs' && !document.hidden) {
+                this.startLogStream();
+                if (this.isAutoScroll) {
+                    this.$nextTick(() => this.scrollToBottom());
+                }
+            } else {
+                this.stopLogStream();
+            }
+        });
+
+        // Pause stream when tab hidden/system sleep, resume cleanly on wake
+        this._visibilityHandler = () => {
+            if (document.hidden) {
+                this.stopLogStream();
+            } else if (Alpine.store('global')?.activeTab === 'logs') {
+                this.startLogStream();
+            }
+        };
+        document.addEventListener('visibilitychange', this._visibilityHandler);
 
         // Sync DEBUG filter with debugLogging sub-toggle
         const settings = Alpine.store('settings');
@@ -66,16 +96,55 @@ window.Components.logsViewer = () => ({
 
     reconnectTimer: null,
 
-    startLogStream() {
+    _flushLogs() {
+        this._flushTimer = null;
+        if (this._incomingBuffer.length === 0) return;
+
+        const toAdd = this._incomingBuffer;
+        this._incomingBuffer = [];
+
+        this.logs.push(...toAdd);
+
+        // Limit log buffer
+        const limit = Alpine.store('settings')?.logLimit || window.AppConstants.LIMITS.DEFAULT_LOG_LIMIT;
+        if (this.logs.length > limit) {
+            this.logs = this.logs.slice(-limit);
+        }
+
+        if (this.isAutoScroll) {
+            this.$nextTick(() => this.scrollToBottom());
+        }
+    },
+
+    stopLogStream() {
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
+        }
+
+        if (this._flushTimer) {
+            clearTimeout(this._flushTimer);
+            this._flushTimer = null;
+        }
+
+        // Flush any remaining buffered logs before closing
+        if (this._incomingBuffer.length > 0) {
+            this._flushLogs();
         }
 
         if (this.eventSource) {
             this.eventSource.close();
             this.eventSource = null;
         }
+    },
+
+    startLogStream() {
+        // Guard: only stream when logs tab is active and page is visible
+        if (Alpine.store('global')?.activeTab !== 'logs' || document.hidden) {
+            return;
+        }
+
+        this.stopLogStream();
 
         const password = Alpine.store('global').webuiPassword;
         const url = password
@@ -86,16 +155,12 @@ window.Components.logsViewer = () => ({
         this.eventSource.onmessage = (event) => {
             try {
                 const log = JSON.parse(event.data);
-                this.logs.push(log);
+                log._id = ++_logIdCounter;
+                this._incomingBuffer.push(log);
 
-                // Limit log buffer
-                const limit = Alpine.store('settings')?.logLimit || window.AppConstants.LIMITS.DEFAULT_LOG_LIMIT;
-                if (this.logs.length > limit) {
-                    this.logs = this.logs.slice(-limit);
-                }
-
-                if (this.isAutoScroll) {
-                    this.$nextTick(() => this.scrollToBottom());
+                // Batch buffer flush (50ms throttle) to eliminate per-log DOM thrashing
+                if (!this._flushTimer) {
+                    this._flushTimer = setTimeout(() => this._flushLogs(), 50);
                 }
             } catch (e) {
                 if (window.UILogger) window.UILogger.debug('Log parse error:', e.message);
@@ -104,14 +169,12 @@ window.Components.logsViewer = () => ({
 
         this.eventSource.onerror = () => {
             if (window.UILogger) window.UILogger.debug('Log stream disconnected, reconnecting...');
-            if (this.eventSource) {
-                this.eventSource.close();
-                this.eventSource = null;
-            }
+            this.stopLogStream();
+
             if (!this.reconnectTimer) {
                 this.reconnectTimer = setTimeout(() => {
                     this.reconnectTimer = null;
-                    if (!document.hidden) {
+                    if (!document.hidden && Alpine.store('global')?.activeTab === 'logs') {
                         this.startLogStream();
                     }
                 }, 3000);
@@ -125,6 +188,7 @@ window.Components.logsViewer = () => ({
     },
 
     clearLogs() {
+        this._incomingBuffer = [];
         this.logs = [];
     },
 
