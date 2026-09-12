@@ -510,7 +510,13 @@ export function sanitizeSchema(schema) {
         'required',
         'items',
         'enum',
-        'title'
+        'title',
+        'anyOf',
+        'oneOf',
+        'allOf',
+        '$ref',
+        '$defs',
+        'definitions'
     ]);
 
     const sanitized = {};
@@ -538,6 +544,8 @@ export function sanitizeSchema(schema) {
             } else {
                 sanitized.items = sanitizeSchema(value);
             }
+        } else if ((key === 'anyOf' || key === 'oneOf' || key === 'allOf') && Array.isArray(value)) {
+            sanitized[key] = value.map(item => sanitizeSchema(item));
         } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
             sanitized[key] = sanitizeSchema(value);
         } else {
@@ -551,7 +559,9 @@ export function sanitizeSchema(schema) {
     }
 
     // If object type with no properties, add placeholder
-    if (sanitized.type === 'object' && (!sanitized.properties || Object.keys(sanitized.properties).length === 0)) {
+    // Skip if there are union/reference keywords that will provide the structure later
+    const hasUnions = sanitized.anyOf || sanitized.oneOf || sanitized.allOf || sanitized.$ref;
+    if (sanitized.type === 'object' && !hasUnions && (!sanitized.properties || Object.keys(sanitized.properties).length === 0)) {
         sanitized.properties = {
             reason: {
                 type: 'string',
@@ -667,6 +677,25 @@ export function cleanSchema(schema) {
     // Only convert at current level - nested types already converted by recursive cleanSchema calls
     if (result.type && typeof result.type === 'string') {
         result.type = toGoogleType(result.type);
+    }
+
+    // Enforce type/keyword consistency (Google validates this strictly):
+    // "properties"/"required" are only allowed on OBJECT, "items" only on ARRAY.
+    // Schema unions (e.g. type: ["string","object"]) are flattened above by picking
+    // one type, which can leave keywords behind from the discarded variant.
+    if (typeof result.type === 'string') {
+        if (result.type !== 'OBJECT') {
+            delete result.properties;
+            delete result.required;
+        }
+        if (result.type !== 'ARRAY') {
+            delete result.items;
+        }
+    }
+
+    // Ensure ARRAY types always have an items schema
+    if (result.type === 'ARRAY' && !result.items) {
+        result.items = { type: 'STRING', description: 'Any type (fallback)' };
     }
 
     return result;

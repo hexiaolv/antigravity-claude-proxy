@@ -254,6 +254,111 @@ async function runTests() {
         assertEqual(result.properties.todoList.items.properties.status.type, 'STRING');
     });
 
+    // Walk every schema node and assert Google's type/keyword rules hold.
+    function findViolations(node, path, out) {
+        if (!node || typeof node !== 'object' || Array.isArray(node)) return out;
+        if (typeof node.type === 'string') {
+            if (node.type !== 'OBJECT' && (node.properties || node.required)) {
+                out.push(`${path}: properties/required on ${node.type}`);
+            }
+            if (node.type !== 'ARRAY' && node.items) {
+                out.push(`${path}: items on ${node.type}`);
+            }
+            if (node.type === 'ARRAY' && !node.items) {
+                out.push(`${path}: ARRAY without items`);
+            }
+        }
+        if (node.properties) {
+            for (const [k, v] of Object.entries(node.properties)) findViolations(v, `${path}.${k}`, out);
+        }
+        if (node.items) findViolations(node.items, `${path}.items`, out);
+        return out;
+    }
+
+    // Test 11: Union types must not leave stray properties/required behind
+    // Regression: "parameters.properties[to].properties: only allowed for OBJECT type"
+    test('Type union does not leave properties/required on non-OBJECT', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                to: {
+                    type: ['string', 'object'],
+                    properties: { name: { type: 'string' } },
+                    required: ['name']
+                }
+            },
+            required: ['to']
+        };
+
+        const result = cleanSchema(sanitizeSchema(schema));
+        const violations = findViolations(result, 'root', []);
+
+        assertEqual(violations, [], 'No type/keyword violations expected');
+        assertEqual(result.properties.to.type, 'STRING', 'Union should flatten to first non-null type');
+        assertEqual(result.properties.to.properties, undefined, 'properties must be dropped');
+        assertEqual(result.properties.to.required, undefined, 'required must be dropped');
+    });
+
+    // Test 12: Union types must preserve union keywords instead of replacing them with a placeholder
+    // Regression: "parameters.properties[where].items.items: missing field"
+    test('anyOf is preserved and never yields an ARRAY without items', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'object',
+                    properties: {
+                        where: {
+                            type: 'array',
+                            items: { anyOf: [{ type: 'array' }, { type: 'string' }] }
+                        }
+                    }
+                }
+            }
+        };
+
+        const result = cleanSchema(sanitizeSchema(schema));
+        const violations = findViolations(result, 'root', []);
+
+        assertEqual(violations, [], 'No type/keyword violations expected');
+        assertEqual(result.properties.query.properties.where.type, 'ARRAY');
+        assertEqual(
+            result.properties.query.properties.where.items.type,
+            'ARRAY',
+            'anyOf should survive sanitization so the array branch wins'
+        );
+        assertIncludes(
+            result.properties.query.properties.where.items.description,
+            'Accepts: array | string',
+            'Union hint should be recorded'
+        );
+    });
+
+    // Test 13: Nested unions are cleaned all the way down
+    test('Nested union with stray keywords is cleaned recursively', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                q: {
+                    type: 'array',
+                    items: {
+                        type: ['object', 'string'],
+                        properties: { w: { type: 'array' } },
+                        required: ['w']
+                    }
+                }
+            }
+        };
+
+        const result = cleanSchema(sanitizeSchema(schema));
+        const violations = findViolations(result, 'root', []);
+
+        assertEqual(violations, [], 'No type/keyword violations expected');
+        assertEqual(result.properties.q.items.type, 'OBJECT', 'Object branch wins the union');
+        assertEqual(result.properties.q.items.properties.w.type, 'ARRAY');
+        assertEqual(result.properties.q.items.properties.w.items.type, 'STRING', 'Nested ARRAY gets items fallback');
+    });
+
     // Summary
     console.log('\n' + '═'.repeat(60));
     console.log(`Tests completed: ${passed} passed, ${failed} failed`);
