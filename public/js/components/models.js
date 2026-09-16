@@ -6,7 +6,8 @@
 window.Components = window.Components || {};
 
 window.Components.models = () => ({
-    // View mode: 'categories' (Google style grouped view) or 'details' (individual models table)
+    // 默认不显示底部模型列表，点击按钮才展开
+    showTable: false,
     viewMode: 'categories',
 
     getProgressColor(pct) {

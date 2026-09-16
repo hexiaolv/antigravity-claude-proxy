@@ -50,7 +50,10 @@ document.addEventListener('alpine:init', () => {
                 }
             });
 
-            // 4. Fetch version from API
+            // 4. Initialize i18n
+            this.initI18n();
+
+            // 5. Fetch version from API
             this.fetchVersion();
         },
 
@@ -79,33 +82,60 @@ document.addEventListener('alpine:init', () => {
         webuiPassword: localStorage.getItem('antigravity_webui_password') || '',
 
         // i18n
-        lang: localStorage.getItem('app_lang') || 'en',
+        supportedLangs: ['zh', 'en', 'tr', 'id', 'pt'],
+        userLang: localStorage.getItem('app_lang') || 'auto',
+        lang: 'en',
         translations: window.translations || {},
 
-        // Toast Messages
-        toast: null,
+        detectSystemLanguage() {
+            const navLangs = navigator.languages || [navigator.language || 'en'];
+            for (const l of navLangs) {
+                if (!l) continue;
+                const lower = l.toLowerCase();
+                if (lower.startsWith('zh')) return 'zh';
+                if (lower.startsWith('tr')) return 'tr';
+                if (lower.startsWith('id')) return 'id';
+                if (lower.startsWith('pt')) return 'pt';
+                if (lower.startsWith('en')) return 'en';
+            }
+            return 'en';
+        },
 
-        // OAuth Progress
-        oauthProgress: {
-            active: false,
-            current: 0,
-            max: 60,
-            cancel: null
+        initI18n() {
+            this.lang = this.userLang === 'auto' ? this.detectSystemLanguage() : this.userLang;
+            if (!this.supportedLangs.includes(this.lang)) {
+                this.lang = 'en';
+            }
+            document.documentElement.setAttribute('lang', this.lang);
         },
 
         t(key, params = {}) {
-            let str = this.translations[this.lang][key] || key;
-            if (typeof str === 'string') {
+            const currentDict = this.translations[this.lang] || {};
+            const fallbackDict = this.translations['en'] || {};
+            let str = currentDict[key];
+            if (str === undefined || str === null || str === '') {
+                str = fallbackDict[key];
+            }
+            if (str === undefined || str === null || str === '') {
+                str = key;
+            }
+            if (typeof str === 'string' && params && typeof params === 'object') {
                 Object.keys(params).forEach(p => {
-                    str = str.replace(`{${p}}`, params[p]);
+                    const val = params[p] !== undefined ? params[p] : '';
+                    str = str.split(`{${p}}`).join(val);
                 });
             }
             return str;
         },
 
         setLang(l) {
-            this.lang = l;
+            this.userLang = l;
             localStorage.setItem('app_lang', l);
+            this.lang = l === 'auto' ? this.detectSystemLanguage() : l;
+            if (!this.supportedLangs.includes(this.lang)) {
+                this.lang = 'en';
+            }
+            document.documentElement.setAttribute('lang', this.lang);
             const dataStore = Alpine.store('data');
             if (dataStore && dataStore.computeQuotaRows) {
                 dataStore.computeQuotaRows();

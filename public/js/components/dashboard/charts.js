@@ -53,14 +53,19 @@ let _trendChartUpdateLock = false;
  * @returns {string} rgba color string
  */
 window.DashboardCharts.hexToRgba = function (hex, alpha) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!hex) return `rgba(124, 58, 237, ${alpha})`;
+  const cleanHex = hex.trim();
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(cleanHex);
   if (result) {
     return `rgba(${parseInt(result[1], 16)}, ${parseInt(
       result[2],
       16
     )}, ${parseInt(result[3], 16)}, ${alpha})`;
   }
-  return hex;
+  if (cleanHex.startsWith('rgba') || cleanHex.startsWith('rgb')) {
+    return cleanHex;
+  }
+  return `rgba(124, 58, 237, ${alpha})`;
 };
 
 /**
@@ -531,10 +536,10 @@ window.DashboardCharts.updateTrendChart = function (component) {
           legend: { display: false },
           tooltip: {
             backgroundColor:
-              getThemeColor("--color-space-950") || "rgba(24, 24, 27, 0.9)",
-            titleColor: getThemeColor("--color-text-main"),
-            bodyColor: getThemeColor("--color-text-bright"),
-            borderColor: getThemeColor("--color-space-border"),
+              getThemeColor("--bg-card") || "rgba(24, 24, 27, 0.9)",
+            titleColor: getThemeColor("--text-secondary") || "#94a3b8",
+            bodyColor: getThemeColor("--text-primary") || "#e2e8f0",
+            borderColor: getThemeColor("--border-subtle") || "rgba(255,255,255,0.1)",
             borderWidth: 1,
             padding: 10,
             displayColors: true,
@@ -550,7 +555,7 @@ window.DashboardCharts.updateTrendChart = function (component) {
             display: true,
             grid: { display: false },
             ticks: {
-              color: getThemeColor("--color-text-muted"),
+              color: getThemeColor("--text-secondary") || "#94a3b8",
               font: { size: 10 },
             },
           },
@@ -560,11 +565,11 @@ window.DashboardCharts.updateTrendChart = function (component) {
             grid: {
               display: true,
               color:
-                getThemeColor("--color-space-border") + "1a" ||
+                getThemeColor("--chart-grid-color") ||
                 "rgba(255,255,255,0.05)",
             },
             ticks: {
-              color: getThemeColor("--color-text-muted"),
+              color: getThemeColor("--text-secondary") || "#94a3b8",
               font: { size: 10 },
             },
           },

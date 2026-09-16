@@ -102,9 +102,7 @@ document.addEventListener('alpine:init', () => {
                 }, 150);
             });
 
-            // Theme setup
-            document.documentElement.setAttribute('data-theme', 'black');
-            document.documentElement.classList.add('dark');
+            // 主题由 settings-store.js 的 applyTheme() 统一管理，此处不重复设置
 
             // Chart Defaults
             if (typeof Chart !== 'undefined') {

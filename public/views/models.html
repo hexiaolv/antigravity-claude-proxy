@@ -1,815 +1,240 @@
-<div x-data="models" class="view-container">
+<div x-data="models" class="flex-col gap-6" style="display: flex;">
     <!-- Compact Header -->
-    <div class="flex items-center justify-between gap-4 mb-6">
-        <!-- Title with inline subtitle -->
-        <div class="flex flex-wrap items-center gap-4">
-            <h1 class="text-2xl font-bold text-white tracking-tight" x-text="$store.global.t('models')">
+    <div class="flex-row items-center justify-between gap-4" style="flex-wrap: wrap;">
+        <!-- Title -->
+        <div class="flex-row items-center gap-3">
+            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" x-text="$store.global.t('models')">
                 Models
             </h1>
-            <div class="flex items-center h-6 px-3 rounded-full bg-space-800/80 border border-space-border/50 shadow-sm backdrop-blur-sm">
-                <span class="text-[10px] font-mono text-gray-400 uppercase tracking-wider"
-                      x-text="$store.global.t('modelsPageDesc')">
+            <div style="padding: 2px 10px; border-radius: 12px; background: var(--md-sys-color-surface-container-high); border: 1px solid var(--border-subtle);">
+                <span class="font-mono text-xs" style="color: var(--text-secondary);" x-text="$store.global.t('modelsPageDesc')">
                     Real-time quota and status for all available models.
                 </span>
             </div>
         </div>
 
         <!-- Search Bar -->
-        <div class="relative w-72 h-9">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-            </div>
-            <input type="text"
-                :placeholder="$store.global.t('searchPlaceholder')"
-                :aria-label="$store.global.t('searchPlaceholder')"
-                class="input-search-sm pr-10"
-                x-model.debounce="$store.data.filters.search"
-                @input="$store.data.computeQuotaRows()">
-            <button x-show="$store.data.filters.search"
-                    x-transition:enter="transition ease-out duration-100"
-                    x-transition:enter-start="opacity-0 scale-75"
-                    x-transition:enter-end="opacity-100 scale-100"
-                    @click="$store.data.filters.search = ''; $store.data.computeQuotaRows()"
-                    class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white transition-colors">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
+        <div class="m3-search-box">
+            <md-outlined-text-field 
+                :value="$store.data.filters.search" 
+                @input="$store.data.filters.search = $event.target.value; $store.data.computeQuotaRows()" 
+                :placeholder="$store.global.t('searchPlaceholder')">
+                <span class="material-symbols-outlined" slot="leading-icon" style="font-size: 20px;">search</span>
+            </md-outlined-text-field>
         </div>
     </div>
 
-    <!-- Controls -->
-    <div class="view-card !p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
-        <div class="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto flex-wrap">
-            <!-- Custom Select -->
-            <div class="relative w-full md:w-64 h-9">
-                <select
-                    class="w-full h-full bg-space-800 border border-space-border text-gray-300 rounded-lg pl-4 pr-10 focus:outline-none focus:border-neon-purple focus:ring-1 focus:ring-neon-purple transition-all truncate text-xs cursor-pointer"
-                    style="appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: none;"
-                    x-model="$store.data.filters.account" @change="$store.data.computeQuotaRows()">
-                    <option value="all" x-text="$store.global.t('allAccounts')">All Accounts</option>
-                    <template x-for="acc in $store.data.accounts" :key="acc.email">
-                        <option :value="acc.email" x-text="Redact.email(acc.email).split('@')[0]"></option>
-                    </template>
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+    <!-- Section 1: 各账号独立配额明细 (Per-Account Quota Breakdown) -->
+    <div class="m3-card" x-show="$store.data.accountCategoryCards.length > 0">
+        <div class="m3-card-header flex-row items-center justify-between" style="margin-bottom: 0.75rem;">
+            <div class="flex-row items-center gap-2">
+                <span class="material-symbols-outlined" style="color: var(--md-sys-color-tertiary);">badge</span>
+                <span class="m3-card-title" style="margin-bottom: 0;" x-text="$store.global.t('accountQuotaBreakdown')">各账号独立配额概览</span>
             </div>
-
-            <!-- Filter Buttons -->
-            <div class="join h-9 w-full md:w-auto overflow-x-auto">
-                <button
-                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border/50 bg-space-800 transition-all font-medium text-[10px] tracking-wide"
-                    :class="$store.data.filters.family === 'all'
-                        ? 'bg-neon-purple/20 text-neon-purple border-neon-purple/60 shadow-lg shadow-neon-purple/10'
-                        : 'text-gray-400 hover:text-white hover:bg-space-700 hover:border-space-border'"
-                    @click="$store.data.filters.family = 'all'; $store.data.computeQuotaRows()"
-                    x-text="$store.global.t('allCaps')">ALL</button>
-                <button
-                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border/50 bg-space-800 transition-all font-medium text-[10px] tracking-wide"
-                    :class="$store.data.filters.family === 'claude'
-                        ? 'bg-neon-purple/20 text-neon-purple border-neon-purple/60 shadow-lg shadow-neon-purple/10'
-                        : 'text-gray-400 hover:text-white hover:bg-space-700 hover:border-space-border'"
-                    @click="$store.data.filters.family = 'claude'; $store.data.computeQuotaRows()"
-                    x-text="$store.global.t('claudeCaps')">CLAUDE</button>
-                <button
-                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border/50 bg-space-800 transition-all font-medium text-[10px] tracking-wide"
-                    :class="$store.data.filters.family === 'gemini'
-                        ? 'bg-neon-green/20 text-neon-green border-neon-green/60 shadow-lg shadow-neon-green/10'
-                        : 'text-gray-400 hover:text-white hover:bg-space-700 hover:border-space-border'"
-                    @click="$store.data.filters.family = 'gemini'; $store.data.computeQuotaRows()"
-                    x-text="$store.global.t('geminiCaps')">GEMINI</button>
-            </div>
-
-            <!-- Show Hidden Toggle -->
-            <button
-                class="btn h-9 px-4 ml-2 border border-space-border/50 bg-space-800 hover:bg-space-700 hover:border-space-border hover:text-white transition-all gap-2 min-h-0"
-                :class="$store.settings.showHiddenModels ? 'text-neon-purple border-neon-purple/50 bg-neon-purple/10' : 'text-gray-400'"
-                @click="$store.settings.toggle('showHiddenModels'); $store.data.computeQuotaRows()"
-                :title="$store.settings.showHiddenModels ? $store.global.t('hideHidden') : $store.global.t('showHidden')">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                </svg>
-                <span class="text-[10px] font-medium uppercase tracking-wide" x-text="$store.settings.showHiddenModels ? $store.global.t('hiddenOn') : $store.global.t('hiddenOff')"></span>
-            </button>
-
-            <!-- Show All Accounts Toggle (only in detail mode) -->
-            <button x-show="viewMode === 'details' && !$store.settings.compact"
-                class="btn h-9 px-4 ml-2 border border-space-border/50 bg-space-800 hover:bg-space-700 hover:border-space-border hover:text-white transition-all gap-2 min-h-0"
-                :class="$store.settings.showAllAccounts ? 'text-neon-purple border-neon-purple/50 bg-neon-purple/10' : 'text-gray-400'"
-                @click="$store.settings.toggle('showAllAccounts')"
-                :title="$store.settings.showAllAccounts ? 'Cap account rows' : 'Show all account rows'">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span class="text-[10px] font-medium uppercase tracking-wide" x-text="$store.settings.showAllAccounts ? 'All' : 'Capped'"></span>
-            </button>
+            <span class="font-mono text-xs" style="color: var(--text-secondary);" x-text="$store.global.t('totalAccountsCount', { count: $store.data.accountCategoryCards.length })"></span>
         </div>
 
-        <!-- View Mode Switch -->
-        <div class="join h-9 self-end lg:self-auto border border-space-border rounded-lg overflow-hidden p-0.5 bg-space-850 shadow-sm">
-            <button class="join-item px-3.5 h-full rounded-md text-xs font-medium transition-all flex items-center gap-1.5"
-                    :class="viewMode === 'categories' ? 'bg-blue-600 text-white shadow-sm font-semibold' : 'text-gray-400 hover:text-white hover:bg-space-800'"
-                    @click="viewMode = 'categories'">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                <span x-text="$store.global.t('categoryCardsView')">Category Cards</span>
-            </button>
-            <button class="join-item px-3.5 h-full rounded-md text-xs font-medium transition-all flex items-center gap-1.5"
-                    :class="viewMode === 'details' ? 'bg-blue-600 text-white shadow-sm font-semibold' : 'text-gray-400 hover:text-white hover:bg-space-800'"
-                    @click="viewMode = 'details'">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                <span x-text="$store.global.t('detailTableView')">Models Table</span>
-            </button>
+        <div class="flex-col gap-3">
+            <template x-for="accCard in $store.data.accountCategoryCards" :key="accCard.email">
+                <div style="padding: 12px 16px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border-subtle);">
+                    <!-- Header of Account -->
+                    <div class="flex-row items-center justify-between gap-3" style="flex-wrap: wrap; margin-bottom: 10px;">
+                        <div class="flex-row items-center gap-2">
+                            <span class="material-symbols-outlined" style="font-size: 20px; color: var(--text-secondary);">account_circle</span>
+                            <span class="font-mono text-sm font-bold" x-text="accCard.displayEmail"></span>
+                            <span class="m3-status-pill" :style="{ background: accCard.tier === 'ultra' ? 'rgba(234, 179, 8, 0.15)' : 'var(--md-sys-color-secondary-container)' }" x-text="(accCard.tier || 'free').toUpperCase()"></span>
+                            <span class="text-xs font-mono" :style="{ color: accCard.enabled ? '#22c55e' : 'var(--text-secondary)' }" x-text="accCard.enabled ? 'ACTIVE' : 'DISABLED'"></span>
+                        </div>
+                        <div class="flex-row items-center gap-2">
+                            <md-text-button @click="$store.data.filters.account = accCard.email; $store.data.computeQuotaRows();">
+                                <span class="material-symbols-outlined" slot="icon">filter_alt</span>
+                                <span x-text="$store.global.t('filterThisAccount')">只看此账号</span>
+                            </md-text-button>
+                        </div>
+                    </div>
+
+                    <!-- Dual Categories for Account -->
+                    <div class="m3-grid-2col" style="margin-bottom: 0; gap: 0.75rem;">
+                        <!-- Gemini -->
+                        <div style="padding: 8px 12px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-subtle);">
+                            <div class="flex-row items-center justify-between text-xs" style="margin-bottom: 6px;">
+                                <span class="font-semibold">Gemini Models</span>
+                                <span class="font-mono font-bold" x-text="'5H: ' + accCard.gemini.fiveHour.pct + '% · W: ' + accCard.gemini.weekly.pct + '%'"></span>
+                            </div>
+                            <md-linear-progress :value="accCard.gemini.fiveHour.pct / 100"></md-linear-progress>
+                            <div class="flex-row items-center justify-between text-xs font-mono" style="color: var(--text-secondary); margin-top: 6px;">
+                                <span x-text="accCard.gemini.fiveHour.resetTime ? $store.global.t('resetPrefix') + window.utils.formatTimeUntil(accCard.gemini.fiveHour.resetTime) : $store.global.t('ready5H')"></span>
+                                <span x-text="accCard.gemini.weekly.resetTime ? $store.global.t('weeklyPrefix') + window.utils.formatTimeUntil(accCard.gemini.weekly.resetTime) : ''"></span>
+                            </div>
+                        </div>
+
+                        <!-- Claude -->
+                        <div style="padding: 8px 12px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-subtle);">
+                            <div class="flex-row items-center justify-between text-xs" style="margin-bottom: 6px;">
+                                <span class="font-semibold">Claude & GPT Models</span>
+                                <span class="font-mono font-bold" x-text="'5H: ' + accCard.claude.fiveHour.pct + '% · W: ' + accCard.claude.weekly.pct + '%'"></span>
+                            </div>
+                            <md-linear-progress :value="accCard.claude.fiveHour.pct / 100"></md-linear-progress>
+                            <div class="flex-row items-center justify-between text-xs font-mono" style="color: var(--text-secondary); margin-top: 6px;">
+                                <span x-text="accCard.claude.fiveHour.resetTime ? $store.global.t('resetPrefix') + window.utils.formatTimeUntil(accCard.claude.fiveHour.resetTime) : $store.global.t('ready5H')"></span>
+                                <span x-text="accCard.claude.weekly.resetTime ? $store.global.t('weeklyPrefix') + window.utils.formatTimeUntil(accCard.claude.weekly.resetTime) : ''"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </div>
     </div>
 
-    <!-- Categories View Mode (Google Style Grouped Quota View) -->
-    <div x-show="viewMode === 'categories'" class="space-y-4">
-        <!-- ========================================================= -->
-        <!-- 1. 全局配额总池 (Global Aggregate Quota Pool) - 紧凑控制台 -->
-        <!-- ========================================================= -->
-        <section class="rounded-xl border border-blue-500/25 bg-blue-500/5 dark:bg-space-900/90 p-4 shadow-sm">
-            <!-- 头部：标题与账号统计在一行 -->
-            <div class="flex items-center justify-between gap-3 pb-3 border-b border-space-border mb-3">
-                <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
-                    <h2 class="text-sm font-bold text-white tracking-tight" x-text="$store.global.t('globalQuotaPool')">全局配额总池</h2>
-                    <span class="px-2 py-0.5 text-[10px] font-semibold rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" x-text="$store.global.t('globalPoolBadge')">全系统聚合</span>
-                    <span class="text-[11px] text-gray-400 hidden sm:inline" x-text="$store.global.t('globalPoolSubtitle')">跨所有已激活账号的聚合平均配额与最快刷新预测</span>
+    <!-- Section 2: 逐模型详细列表与账号分配明细 (Detailed Models Table) -->
+    <div class="m3-card" style="padding: 0; overflow: hidden;">
+        <!-- Header Toggle Bar -->
+        <div class="flex-row items-center justify-between" 
+             style="padding: 12px 16px; background: var(--bg-surface); cursor: pointer; user-select: none;"
+             :style="showTable ? 'border-bottom: 1px solid var(--border-subtle);' : ''"
+             @click="showTable = !showTable">
+            <div class="flex-row items-center gap-2">
+                <span class="material-symbols-outlined" style="color: var(--md-sys-color-primary);">table_chart</span>
+                <span class="m3-card-title" style="margin-bottom: 0;" x-text="$store.global.t('detailTableView')">模型明细表</span>
+                <span class="m3-status-pill" style="font-size: 11px; padding: 2px 8px;" x-text="$store.global.t('showingModels', { count: $store.data.quotaRows.length })"></span>
+            </div>
+            <md-outlined-button @click.stop="showTable = !showTable">
+                <span class="material-symbols-outlined" slot="icon" x-text="showTable ? 'expand_less' : 'expand_more'"></span>
+                <span x-text="showTable ? $store.global.t('hideModelsTable') : $store.global.t('showModelsTable')"></span>
+            </md-outlined-button>
+        </div>
+
+        <!-- Collapsible Content -->
+        <div x-show="showTable">
+            <!-- Controls Toolbar -->
+            <div style="background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); padding: 12px 16px;" class="flex-row items-center justify-between gap-4">
+                <div class="flex-row items-center gap-3 flex-wrap">
+                    <!-- Account Filter Select -->
+                    <div style="min-width: 180px;">
+                        <select style="width: 100%; height: 40px; padding: 0 36px 0 12px; font-size: 0.85rem;"
+                            x-model="$store.data.filters.account" @change="$store.data.computeQuotaRows()">
+                            <option value="all" x-text="$store.global.t('allAccounts')">All Accounts</option>
+                            <template x-for="acc in $store.data.accounts" :key="acc.email">
+                                <option :value="acc.email" x-text="Redact.email(acc.email).split('@')[0]"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                <!-- Family Filter Chips -->
+                <div class="flex-row items-center gap-1">
+                    <md-filter-chip class="m3-chip-radio" label="ALL" :selected="$store.data.filters.family === 'all'" @click="$store.data.filters.family = 'all'; $store.data.computeQuotaRows()"></md-filter-chip>
+                    <md-filter-chip class="m3-chip-radio" label="CLAUDE" :selected="$store.data.filters.family === 'claude'" @click="$store.data.filters.family = 'claude'; $store.data.computeQuotaRows()"></md-filter-chip>
+                    <md-filter-chip class="m3-chip-radio" label="GEMINI" :selected="$store.data.filters.family === 'gemini'" @click="$store.data.filters.family = 'gemini'; $store.data.computeQuotaRows()"></md-filter-chip>
                 </div>
-                <div class="px-2.5 py-1 rounded-md bg-space-800 border border-space-border text-xs text-gray-300 font-mono flex-shrink-0"
-                      x-text="$store.global.t('effectiveAccounts', { count: $store.data.categorySummary.gemini.totalCount })">
+
+                <!-- Show Hidden Switch -->
+                <div class="flex-row items-center gap-2" style="margin-left: 8px;">
+                    <span class="text-xs font-mono" style="color: var(--text-secondary);" x-text="$store.settings.showHiddenModels ? $store.global.t('hiddenOn') : $store.global.t('hiddenOff')"></span>
+                    <md-switch :selected="$store.settings.showHiddenModels" @change="$store.settings.toggle('showHiddenModels'); $store.data.computeQuotaRows()"></md-switch>
                 </div>
             </div>
 
-            <!-- 全局两大类别网格 -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <!-- 1. Gemini Models 全局卡片 -->
-                <div x-show="$store.data.filters.family === 'all' || $store.data.filters.family === 'gemini'"
-                     class="rounded-lg border border-emerald-500/25 bg-space-900 p-3.5 space-y-2.5 shadow-sm">
-                    <div class="flex items-center justify-between pb-2 border-b border-space-border">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-neon-green"></span>
-                            <span class="font-bold text-xs text-white">Gemini Models</span>
-                            <span class="text-[10px] text-gray-400 font-mono">Flash / Pro 2.5</span>
-                        </div>
-                        <span class="text-[10px] px-2 py-0.5 rounded border font-mono font-medium"
-                              :class="getProgressBg($store.data.categorySummary.gemini.fiveHour.avgPct)"
-                              x-text="$store.global.t('healthyAccounts', { healthy: $store.data.categorySummary.gemini.healthyCount, total: $store.data.categorySummary.gemini.totalCount })">
-                        </span>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <!-- 5小时限额 -->
-                        <div class="rounded-md border border-space-border bg-space-950 p-2.5 flex items-center justify-between gap-2">
-                            <div class="space-y-0.5 min-w-0">
-                                <div class="text-[11px] font-medium text-gray-400 flex items-center gap-1">
-                                    <span class="text-white font-semibold" x-text="$store.global.t('fiveHourLimit')">5小时限额</span>
-                                    <span class="text-[9px] text-gray-500 font-mono">5H</span>
-                                </div>
-                                <div class="text-[10px] text-gray-500 truncate" :title="$store.data.categorySummary.gemini.fiveHour.noticeText" x-text="$store.data.categorySummary.gemini.fiveHour.noticeText"></div>
-                                <div x-show="$store.data.categorySummary.gemini.fiveHour.earliestReset"
-                                     class="text-[10px] text-amber-500 font-mono truncate"
-                                     :title="`最快回血: ${window.utils.formatTimeUntil($store.data.categorySummary.gemini.fiveHour.earliestReset)}`">
-                                    ⚡ <span x-text="window.utils.formatTimeUntil($store.data.categorySummary.gemini.fiveHour.earliestReset)"></span>
-                                    <span x-show="$store.data.categorySummary.gemini.fiveHour.earliestAccount" class="opacity-75" x-text="`(${$store.data.categorySummary.gemini.fiveHour.earliestAccount})`"></span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-1.5 flex-shrink-0">
-                                <span class="text-base font-bold text-white font-mono" x-text="`${$store.data.categorySummary.gemini.fiveHour.avgPct}%`"></span>
-                                <div class="relative w-6 h-6 flex items-center justify-center">
-                                    <svg class="w-6 h-6 -rotate-90 origin-center" viewBox="0 0 36 36">
-                                        <path class="text-slate-200 dark:text-gray-700/40" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                        <path :class="getProgressColor($store.data.categorySummary.gemini.fiveHour.avgPct)" :stroke-dasharray="`${$store.data.categorySummary.gemini.fiveHour.avgPct}, 100`" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 周限额 -->
-                        <div class="rounded-md border border-space-border bg-space-950 p-2.5 flex items-center justify-between gap-2">
-                            <div class="space-y-0.5 min-w-0">
-                                <div class="text-[11px] font-medium text-gray-400 flex items-center gap-1">
-                                    <span class="text-white font-semibold" x-text="$store.global.t('weeklyLimit')">周限额</span>
-                                    <span class="text-[9px] text-gray-500 font-mono">Weekly</span>
-                                </div>
-                                <div class="text-[10px] text-gray-500 truncate" :title="$store.data.categorySummary.gemini.weekly.noticeText" x-text="$store.data.categorySummary.gemini.weekly.noticeText"></div>
-                                <div x-show="$store.data.categorySummary.gemini.weekly.earliestReset"
-                                     class="text-[10px] text-indigo-400 font-mono truncate"
-                                     :title="`最快周期刷新: ${window.utils.formatTimeUntil($store.data.categorySummary.gemini.weekly.earliestReset)}`">
-                                    📅 <span x-text="window.utils.formatTimeUntil($store.data.categorySummary.gemini.weekly.earliestReset)"></span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-1.5 flex-shrink-0">
-                                <span class="text-base font-bold text-white font-mono" x-text="`${$store.data.categorySummary.gemini.weekly.avgPct}%`"></span>
-                                <div class="relative w-6 h-6 flex items-center justify-center">
-                                    <svg class="w-6 h-6 -rotate-90 origin-center" viewBox="0 0 36 36">
-                                        <path class="text-slate-200 dark:text-gray-700/40" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                        <path :class="getProgressColor($store.data.categorySummary.gemini.weekly.avgPct)" :stroke-dasharray="`${$store.data.categorySummary.gemini.weekly.avgPct}, 100`" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. Claude and GPT models 全局卡片 -->
-                <div x-show="$store.data.filters.family === 'all' || $store.data.filters.family === 'claude'"
-                     class="rounded-lg border border-purple-500/25 bg-space-900 p-3.5 space-y-2.5 shadow-sm">
-                    <div class="flex items-center justify-between pb-2 border-b border-space-border">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-neon-purple"></span>
-                            <span class="font-bold text-xs text-white">Claude and GPT models</span>
-                            <span class="text-[10px] text-gray-400 font-mono">Sonnet / Opus</span>
-                        </div>
-                        <span class="text-[10px] px-2 py-0.5 rounded border font-mono font-medium"
-                              :class="getProgressBg($store.data.categorySummary.claude.fiveHour.avgPct)"
-                              x-text="$store.global.t('healthyAccounts', { healthy: $store.data.categorySummary.claude.healthyCount, total: $store.data.categorySummary.claude.totalCount })">
-                        </span>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <!-- 5小时限额 -->
-                        <div class="rounded-md border border-space-border bg-space-950 p-2.5 flex items-center justify-between gap-2">
-                            <div class="space-y-0.5 min-w-0">
-                                <div class="text-[11px] font-medium text-gray-400 flex items-center gap-1">
-                                    <span class="text-white font-semibold" x-text="$store.global.t('fiveHourLimit')">5小时限额</span>
-                                    <span class="text-[9px] text-gray-500 font-mono">5H</span>
-                                </div>
-                                <div class="text-[10px] text-gray-500 truncate" :title="$store.data.categorySummary.claude.fiveHour.noticeText" x-text="$store.data.categorySummary.claude.fiveHour.noticeText"></div>
-                                <div x-show="$store.data.categorySummary.claude.fiveHour.earliestReset"
-                                     class="text-[10px] text-amber-500 font-mono truncate"
-                                     :title="`最快回血: ${window.utils.formatTimeUntil($store.data.categorySummary.claude.fiveHour.earliestReset)}`">
-                                    ⚡ <span x-text="window.utils.formatTimeUntil($store.data.categorySummary.claude.fiveHour.earliestReset)"></span>
-                                    <span x-show="$store.data.categorySummary.claude.fiveHour.earliestAccount" class="opacity-75" x-text="`(${$store.data.categorySummary.claude.fiveHour.earliestAccount})`"></span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-1.5 flex-shrink-0">
-                                <span class="text-base font-bold text-white font-mono" x-text="`${$store.data.categorySummary.claude.fiveHour.avgPct}%`"></span>
-                                <div class="relative w-6 h-6 flex items-center justify-center">
-                                    <svg class="w-6 h-6 -rotate-90 origin-center" viewBox="0 0 36 36">
-                                        <path class="text-slate-200 dark:text-gray-700/40" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                        <path :class="getProgressColor($store.data.categorySummary.claude.fiveHour.avgPct)" :stroke-dasharray="`${$store.data.categorySummary.claude.fiveHour.avgPct}, 100`" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 周限额 -->
-                        <div class="rounded-md border border-space-border bg-space-950 p-2.5 flex items-center justify-between gap-2">
-                            <div class="space-y-0.5 min-w-0">
-                                <div class="text-[11px] font-medium text-gray-400 flex items-center gap-1">
-                                    <span class="text-white font-semibold" x-text="$store.global.t('weeklyLimit')">周限额</span>
-                                    <span class="text-[9px] text-gray-500 font-mono">Weekly</span>
-                                </div>
-                                <div class="text-[10px] text-gray-500 truncate" :title="$store.data.categorySummary.claude.weekly.noticeText" x-text="$store.data.categorySummary.claude.weekly.noticeText"></div>
-                                <div x-show="$store.data.categorySummary.claude.weekly.earliestReset"
-                                     class="text-[10px] text-indigo-400 font-mono truncate"
-                                     :title="`最快周期刷新: ${window.utils.formatTimeUntil($store.data.categorySummary.claude.weekly.earliestReset)}`">
-                                    📅 <span x-text="window.utils.formatTimeUntil($store.data.categorySummary.claude.weekly.earliestReset)"></span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-1.5 flex-shrink-0">
-                                <span class="text-base font-bold text-white font-mono" x-text="`${$store.data.categorySummary.claude.weekly.avgPct}%`"></span>
-                                <div class="relative w-6 h-6 flex items-center justify-center">
-                                    <svg class="w-6 h-6 -rotate-90 origin-center" viewBox="0 0 36 36">
-                                        <path class="text-slate-200 dark:text-gray-700/40" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                        <path :class="getProgressColor($store.data.categorySummary.claude.weekly.avgPct)" :stroke-dasharray="`${$store.data.categorySummary.claude.weekly.avgPct}, 100`" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <!-- Total count label -->
+            <div class="font-mono text-xs" style="color: var(--text-secondary);" x-text="$store.global.t('showingModels', { count: $store.data.quotaRows.length })">
             </div>
-        </section>
+        </div>
 
-        <!-- ========================================================= -->
-        <!-- 2. 各账号独立配额明细列表 (Per-Account Breakdown) -->
-        <!-- ========================================================= -->
-        <section class="space-y-3">
-            <div class="flex items-center justify-between px-1">
-                <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-neon-cyan"></span>
-                    <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400" x-text="$store.global.t('perAccountBreakdown')">各账号独立配额</h2>
-                </div>
-                <span class="text-[11px] font-mono text-gray-500" x-text="$store.global.t('accountsCountBadge', { count: $store.data.accountCategoryCards.length })"></span>
-            </div>
-
-            <!-- Account Cards Loop -->
-            <div class="space-y-3">
-                <template x-for="accCard in $store.data.accountCategoryCards" :key="accCard.email">
-                    <div class="view-card !p-3.5 space-y-2.5">
-                        <!-- Account Header: 紧凑横条 -->
-                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-space-border pb-2.5">
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-6 h-6 rounded bg-space-800 border border-space-border flex items-center justify-center font-bold text-gray-300 text-xs font-mono"
-                                     x-text="accCard.shortEmail.charAt(0).toUpperCase()">
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-semibold text-white text-xs" x-text="accCard.displayEmail"></span>
-                                    <span class="px-1.5 py-0.2 text-[9px] rounded uppercase font-semibold font-mono border"
-                                          :class="accCard.tier === 'ultra' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : (accCard.tier === 'pro' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-gray-500/10 text-gray-400 border-gray-500/30')"
-                                          x-text="accCard.tier">
-                                    </span>
-                                    <span class="px-1.5 py-0.2 text-[9px] rounded bg-space-800 text-gray-400 border border-space-border font-mono"
-                                          x-text="accCard.enabled ? 'ACTIVE' : 'DISABLED'">
-                                    </span>
-                                </div>
-                            </div>
-                            <button class="btn btn-xs h-6 px-2.5 bg-space-800 hover:bg-space-700 text-gray-300 border border-space-border rounded transition-colors text-[10px] font-medium"
-                                    @click="viewMode = 'details'; $store.data.filters.account = accCard.email; $store.data.computeQuotaRows()"
-                                    x-text="$store.global.t('viewAccountModels')">
-                                查看模型
-                            </button>
-                        </div>
-
-                        <!-- Per-Account Categories Grid -->
-                        <div class="grid gap-2.5"
-                             :class="($store.data.filters.family === 'gemini' || $store.data.filters.family === 'claude') ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'">
-                            <!-- Gemini Models Card -->
-                            <div x-show="$store.data.filters.family === 'all' || $store.data.filters.family === 'gemini'"
-                                 class="border border-space-border bg-space-900 rounded-lg p-2.5 space-y-2">
-                                <div class="flex items-center justify-between text-[11px] font-semibold text-gray-300">
-                                    <span class="flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-neon-green"></span>
-                                        <span>Gemini Models</span>
-                                    </span>
-                                    <span class="text-[9px] font-mono text-gray-500">Flash & Pro</span>
-                                </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <!-- Weekly Limit -->
-                                    <div class="bg-space-950 border border-space-border rounded p-2 flex items-center justify-between gap-1.5">
-                                        <div class="space-y-0.5 min-w-0">
-                                            <div class="text-[10px] text-gray-400 font-medium" x-text="$store.global.t('weeklyLimit')">周限额</div>
-                                            <div class="text-[9px] text-gray-500 truncate" :title="accCard.gemini.weekly.noticeText" x-text="accCard.gemini.weekly.noticeText"></div>
-                                        </div>
-                                        <div class="flex items-center gap-1 flex-shrink-0">
-                                            <span class="text-xs font-bold text-white font-mono" x-text="`${accCard.gemini.weekly.pct}%`"></span>
-                                            <div class="relative w-5 h-5 flex items-center justify-center">
-                                                <svg class="w-5 h-5 -rotate-90 origin-center" viewBox="0 0 36 36">
-                                                    <path class="text-slate-200 dark:text-gray-700/40" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                    <path :class="getProgressColor(accCard.gemini.weekly.pct)" :stroke-dasharray="`${accCard.gemini.weekly.pct}, 100`" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- 5-Hour Limit -->
-                                    <div class="bg-space-950 border border-space-border rounded p-2 flex items-center justify-between gap-1.5">
-                                        <div class="space-y-0.5 min-w-0">
-                                            <div class="text-[10px] text-gray-400 font-medium" x-text="$store.global.t('fiveHourLimit')">5小时限额</div>
-                                            <div class="text-[9px] text-gray-500 truncate" :title="accCard.gemini.fiveHour.noticeText" x-text="accCard.gemini.fiveHour.noticeText"></div>
-                                        </div>
-                                        <div class="flex items-center gap-1 flex-shrink-0">
-                                            <span class="text-xs font-bold text-white font-mono" x-text="`${accCard.gemini.fiveHour.pct}%`"></span>
-                                            <div class="relative w-5 h-5 flex items-center justify-center">
-                                                <svg class="w-5 h-5 -rotate-90 origin-center" viewBox="0 0 36 36">
-                                                    <path class="text-slate-200 dark:text-gray-700/40" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                    <path :class="getProgressColor(accCard.gemini.fiveHour.pct)" :stroke-dasharray="`${accCard.gemini.fiveHour.pct}, 100`" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Claude and GPT models Card -->
-                            <div x-show="$store.data.filters.family === 'all' || $store.data.filters.family === 'claude'"
-                                 class="border border-space-border bg-space-900 rounded-lg p-2.5 space-y-2">
-                                <div class="flex items-center justify-between text-[11px] font-semibold text-gray-300">
-                                    <span class="flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-neon-purple"></span>
-                                        <span>Claude and GPT models</span>
-                                    </span>
-                                    <span class="text-[9px] font-mono text-gray-500">Sonnet & Opus</span>
-                                </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <!-- Weekly Limit -->
-                                    <div class="bg-space-950 border border-space-border rounded p-2 flex items-center justify-between gap-1.5">
-                                        <div class="space-y-0.5 min-w-0">
-                                            <div class="text-[10px] text-gray-400 font-medium" x-text="$store.global.t('weeklyLimit')">周限额</div>
-                                            <div class="text-[9px] text-gray-500 truncate" :title="accCard.claude.weekly.noticeText" x-text="accCard.claude.weekly.noticeText"></div>
-                                        </div>
-                                        <div class="flex items-center gap-1 flex-shrink-0">
-                                            <span class="text-xs font-bold text-white font-mono" x-text="`${accCard.claude.weekly.pct}%`"></span>
-                                            <div class="relative w-5 h-5 flex items-center justify-center">
-                                                <svg class="w-5 h-5 -rotate-90 origin-center" viewBox="0 0 36 36">
-                                                    <path class="text-slate-200 dark:text-gray-700/40" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                    <path :class="getProgressColor(accCard.claude.weekly.pct)" :stroke-dasharray="`${accCard.claude.weekly.pct}, 100`" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- 5-Hour Limit -->
-                                    <div class="bg-space-950 border border-space-border rounded p-2 flex items-center justify-between gap-1.5">
-                                        <div class="space-y-0.5 min-w-0">
-                                            <div class="text-[10px] text-gray-400 font-medium" x-text="$store.global.t('fiveHourLimit')">5小时限额</div>
-                                            <div class="text-[9px] text-gray-500 truncate" :title="accCard.claude.fiveHour.noticeText" x-text="accCard.claude.fiveHour.noticeText"></div>
-                                        </div>
-                                        <div class="flex items-center gap-1 flex-shrink-0">
-                                            <span class="text-xs font-bold text-white font-mono" x-text="`${accCard.claude.fiveHour.pct}%`"></span>
-                                            <div class="relative w-5 h-5 flex items-center justify-center">
-                                                <svg class="w-5 h-5 -rotate-90 origin-center" viewBox="0 0 36 36">
-                                                    <path class="text-slate-200 dark:text-gray-700/40" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                    <path :class="getProgressColor(accCard.claude.fiveHour.pct)" :stroke-dasharray="`${accCard.claude.fiveHour.pct}, 100`" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-
-                <!-- Empty State for Categories View -->
-                <div x-show="!$store.data.initialLoad && $store.data.accountCategoryCards.length === 0" class="view-card py-14 text-center">
-                    <div class="flex flex-col items-center gap-3 max-w-sm mx-auto">
-                        <svg class="w-14 h-14 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <h4 class="text-base font-semibold text-gray-300" x-text="$store.global.t('noAccountsFound') || '未发现匹配的账号'">未发现匹配的账号</h4>
-                        <p class="text-xs text-gray-500">请检查筛选条件或前往账号管理页面添加并授权账号。</p>
-                        <button class="btn bg-neon-purple hover:bg-purple-600 border-none text-white btn-xs px-4 mt-2 shadow-md shadow-neon-purple/20"
-                                @click="$store.global.activeTab = 'accounts'">
-                            <span x-text="$store.global.t('goToAccounts')">Go to Accounts</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <!-- Main Table Card (Detail Mode) -->
-    <div x-show="viewMode === 'details'" class="view-card !p-0">
-        <div class="overflow-x-auto min-h-[400px]">
-            <table class="standard-table"
-                :class="{'table-xs': $store.settings.compact, 'table-sm': !$store.settings.compact}">
-            <thead>
-                <tr>
-                    <th class="w-14 !pl-4 whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group"
-                        @click="$store.data.setSort('avgQuota')">
-                        <div class="flex items-center justify-center">
-                            <span x-text="$store.global.t('stat')">Stat</span>
-                        </div>
-                    </th>
-                    <th class="min-w-[14rem] whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group align-middle"
-                        @click="$store.data.setSort('modelId')">
-                        <div class="flex items-center gap-1">
-                            <span x-text="$store.global.t('modelIdentity')">Model Identity</span>
-                            <svg class="w-3 h-3 transition-colors"
-                                :class="$store.data.filters.sortCol === 'modelId' ? 'text-neon-purple' : 'text-gray-700 opacity-0 group-hover:opacity-100'"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    :d="$store.data.filters.sortCol === 'modelId' ? ($store.data.filters.sortAsc ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7') : 'M8 9l4-4 4 4m0 6l-4 4-4-4'" />
-                            </svg>
-                        </div>
-                    </th>
-                    <th class="min-w-[32rem] whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group align-middle"
-                        @click="$store.data.setSort('avgQuota')">
-                        <div class="flex items-center gap-1">
-                            <span x-text="$store.global.t('globalQuota')">Global Quota</span>
-                            <svg class="w-3 h-3 transition-colors"
-                                :class="$store.data.filters.sortCol === 'avgQuota' ? 'text-neon-purple' : 'text-gray-700 opacity-0 group-hover:opacity-100'"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    :d="$store.data.filters.sortCol === 'avgQuota' ? ($store.data.filters.sortAsc ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7') : 'M8 9l4-4 4 4m0 6l-4 4-4-4'" />
-                            </svg>
-                        </div>
-                    </th>
-                    <th x-show="!$store.settings.compact"
-                        class="min-w-[10.5rem] whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group text-center align-middle"
-                        @click="$store.data.setSort('minResetTime')">
-                        <div class="flex items-center justify-center gap-1">
-                            <span x-text="$store.global.t('nextReset')">Next Reset</span>
-                            <svg class="w-3 h-3 transition-colors"
-                                :class="$store.data.filters.sortCol === 'minResetTime' ? 'text-neon-purple' : 'text-gray-700 opacity-0 group-hover:opacity-100'"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    :d="$store.data.filters.sortCol === 'minResetTime' ? ($store.data.filters.sortAsc ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7') : 'M8 9l4-4 4 4m0 6l-4 4-4-4'" />
-                            </svg>
-                        </div>
-                    </th>
-                    <th x-show="!$store.settings.compact"
-                        class="whitespace-nowrap cursor-pointer hover:text-white transition-colors select-none group text-center align-middle"
-                        @click="$store.data.setSort('activeCount')">
-                        <div class="flex items-center justify-center gap-1">
-                            <span x-text="$store.global.t('distribution')">Account Distribution</span>
-                            <svg class="w-3 h-3 transition-colors"
-                                :class="$store.data.filters.sortCol === 'activeCount' ? 'text-neon-purple' : 'text-gray-700 opacity-0 group-hover:opacity-100'"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    :d="$store.data.filters.sortCol === 'activeCount' ? ($store.data.filters.sortAsc ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7') : 'M8 9l4-4 4 4m0 6l-4 4-4-4'" />
-                            </svg>
-                        </div>
-                    </th>
-                    <th class="w-20 !pr-4 text-center align-middle whitespace-nowrap" x-text="$store.global.t('actions')">Actions
-                    </th>
-                </tr>
-            </thead>
-            <tbody class="text-sm">
-                <template x-for="row in $store.data.quotaRows" :key="row.modelId">
-                    <tr class="group transition-all duration-300 align-middle" :class="row.hidden ? 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0 bg-space-900/50' : ''">
-                        <td class="text-center align-middle !pl-4">
-                            <div class="mx-auto w-2 h-2 rounded-full transition-all duration-500"
-                                :class="row.avgQuota > 0 ? 'bg-neon-green shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'">
-                            </div>
-                        </td>
-                        <td class="align-middle whitespace-nowrap">
-                            <div class="flex flex-col justify-center">
-                                <div class="font-bold text-gray-200 group-hover:text-neon-purple transition-colors"
-                                    :class="$store.settings.compact ? 'text-xs' : ''"
-                                    x-text="row.modelId"></div>
-                                <div class="text-[10px] font-mono text-gray-500 uppercase leading-tight mt-0.5"
-                                    x-show="!$store.settings.compact"
-                                    x-text="$store.global.t('family' + row.family.charAt(0).toUpperCase() + row.family.slice(1))">
-                                </div>
-                            </div>
-                        </td>
-                        <td class="align-middle">
-                            <div class="flex flex-col pr-4" :class="$store.settings.compact ? 'gap-0.5' : 'gap-2'">
-                                <!-- Compact Mode Inline -->
-                                <div x-show="$store.settings.compact" class="flex flex-col gap-0.5">
-                                    <div class="flex justify-between text-xs font-mono">
-                                        <span class="flex items-center gap-1.5">
-                                            <span x-text="row.avgQuota + '%'" :class="row.avgQuota > 0 ? 'text-white' : 'text-red-500'"></span>
-                                            <span x-show="row.avgWeeklyQuota !== null" class="text-neon-cyan/90 text-[10px]" x-text="'· W:' + row.avgWeeklyQuota + '%'"></span>
-                                            <span x-show="row.resetIn && row.resetIn !== '-'" class="text-[10px] text-gray-500" x-text="'· 5H:' + row.resetIn"></span>
-                                            <span x-show="row.weeklyResetIn && row.weeklyResetIn !== '-'" class="text-[10px] text-neon-cyan/80" x-text="'· W:' + row.weeklyResetIn"></span>
-                                        </span>
-                                        <span class="text-gray-500 text-[10px]" x-text="row.quotaInfo.filter(q => q.pct > 0).length + '/' + row.quotaInfo.length"></span>
-                                    </div>
-                                    <progress class="progress w-full bg-space-800 h-1"
-                                        :class="row.avgQuota > 50 ? 'progress-gradient-success' : (row.avgQuota > 0 ? 'progress-gradient-warning' : 'progress-gradient-error')"
-                                        :value="row.avgQuota" max="100"></progress>
-                                </div>
-
-                                <!-- Non-Compact Mode (Design Scheme 1: Dual-Track Progress Bars) -->
-                                <div x-show="!$store.settings.compact" class="space-y-2 max-w-2xl">
-                                    <!-- 5H Track -->
-                                    <div class="space-y-0.5">
-                                        <div class="flex justify-between items-center font-mono text-[11px]">
-                                            <span class="flex items-center gap-1.5">
-                                                <span class="w-5 h-4 flex items-center justify-center rounded bg-space-800 border border-space-border text-gray-400 text-[9px] font-bold flex-shrink-0">5H</span>
-                                                <span class="text-white font-semibold flex items-center gap-1">
-                                                    <span class="inline-block w-8 text-left tabular-nums" x-text="row.avgQuota + '%'"></span>
-                                                    <span class="text-gray-500 font-normal text-[10px]">剩余</span>
-                                                </span>
-                                            </span>
-                                            <span class="text-gray-400 text-[10px]"
-                                                  x-text="row.quotaInfo.length + '/' + row.quotaInfo.length + ' 账号' + (row.minQuota < row.avgQuota ? ' (最低 ' + row.minQuota + '%)' : '')"></span>
-                                        </div>
-                                        <div class="relative">
-                                            <div class="w-full h-1.5 rounded-full bg-space-800 overflow-hidden">
-                                                <div class="h-full rounded-full transition-all duration-500"
-                                                     :class="row.avgQuota > 50 ? 'bg-neon-green' : (row.avgQuota > 0 ? 'bg-yellow-500' : 'bg-red-500')"
-                                                     :style="'width: ' + row.avgQuota + '%'"></div>
-                                            </div>
-                                            <!-- Draggable threshold markers -->
-                                            <template x-for="(q, qIdx) in row.quotaInfo.filter(q => q.thresholdPct > 0 || isDragging(q, row))" :key="q.fullEmail + '-threshold'">
-                                                <div class="absolute -top-1 -bottom-1 group/marker"
-                                                     :class="isDragging(q, row) ? 'cursor-grabbing z-30' : 'cursor-grab'"
-                                                     :style="'left: calc(' + getMarkerPct(q, row) + '% - 4px); width: 9px; transform: translateX(' + (isDragging(q, row) ? '0px' : getMarkerOffset(q, row, qIdx)) + ');'"
-                                                     :title="Redact.email(q.email) + ' min: ' + getMarkerPct(q, row) + '%'"
-                                                     @mousedown.prevent="startDrag($event, q, row)"
-                                                     @touchstart.prevent="startDrag($event, q, row)">
-                                                    <div class="absolute top-1 bottom-1 left-1 w-[3px] rounded-full"
-                                                         :class="isDragging(q, row) ? 'scale-y-150 brightness-150' : 'transition-all group-hover/marker:scale-y-150 group-hover/marker:brightness-125'"
-                                                         :style="'background-color: ' + getThresholdColor(qIdx).bg + '; box-shadow: 0 0 ' + (isDragging(q, row) ? '10px' : '6px') + ' ' + getThresholdColor(qIdx).shadow"></div>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </div>
-
-                                    <!-- Weekly Track -->
-                                    <div x-show="row.avgWeeklyQuota !== null" class="space-y-0.5">
-                                        <div class="flex justify-between items-center font-mono text-[11px]">
-                                            <span class="flex items-center gap-1.5">
-                                                <span class="w-5 h-4 flex items-center justify-center rounded bg-neon-cyan/20 border border-neon-cyan/30 text-neon-cyan text-[9px] font-bold flex-shrink-0">W</span>
-                                                <span class="text-neon-cyan font-semibold flex items-center gap-1">
-                                                    <span class="inline-block w-8 text-left tabular-nums" x-text="row.avgWeeklyQuota + '%'"></span>
-                                                    <span class="text-neon-cyan/60 font-normal text-[10px]">剩余</span>
-                                                </span>
-                                            </span>
-                                            <span class="text-gray-500 text-[10px]">本周平均已消耗 <span class="text-gray-300 font-semibold" x-text="(row.avgWeeklyUsedPct ?? 0) + '%'"></span></span>
-                                        </div>
-                                        <div class="w-full h-1.5 rounded-full bg-space-800 overflow-hidden">
-                                            <div class="h-full rounded-full bg-gradient-to-r from-cyan-600 to-neon-cyan transition-all duration-500"
-                                                 :style="'width: ' + (row.avgWeeklyQuota || 0) + '%'"></div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Multi-account Breakdown -->
-                                    <div x-show="!$store.settings.compact && row.quotaInfo && row.quotaInfo.length > 1"
-                                         class="pt-2 mt-2 border-t border-space-border/50 space-y-1.5">
-                                        <div class="text-[10px] font-mono text-gray-400 flex items-center justify-between pb-0.5">
-                                            <span x-text="row.quotaInfo.length + ' 个账号逐账号明细:'"></span>
-                                            <span class="text-neon-cyan/80 text-[9px]">双轨独立核算</span>
-                                        </div>
-                                        <template x-for="q in getVisibleAccounts(row)" :key="q.fullEmail + '-detail'">
-                                            <div class="flex items-center text-[10px] font-mono text-gray-400">
-                                                <!-- 1. Account Name: fixed width -->
-                                                <span class="w-24 truncate text-gray-300 text-left flex-shrink-0" x-text="Redact.email(q.email)"></span>
-
-                                                <!-- 2. Dual Bars: flexible space with min-width -->
-                                                <div class="flex-1 mx-3 flex gap-2 items-center min-w-[8rem]">
-                                                    <div class="flex-1 h-1.5 bg-space-800 rounded-full overflow-hidden" :title="'5H: ' + q.pct + '%'">
-                                                        <div class="h-full rounded-full transition-all duration-500"
-                                                             :class="q.pct > 50 ? 'bg-neon-green' : (q.pct > 0 ? 'bg-amber-400' : 'bg-red-500/60')"
-                                                             :style="'width: ' + q.pct + '%'"></div>
-                                                    </div>
-                                                    <div x-show="q.weeklyPct !== null && q.weeklyPct !== undefined"
-                                                         class="flex-1 h-1.5 bg-space-800 rounded-full overflow-hidden" :title="'W: ' + q.weeklyPct + '%'">
-                                                        <div class="h-full rounded-full bg-neon-cyan transition-all duration-500"
-                                                             :style="'width: ' + q.weeklyPct + '%'"></div>
-                                                    </div>
-                                                </div>
-
-                                                <!-- 3. Percentages: fixed width text-right -->
-                                                <span class="w-28 text-right text-gray-300 flex-shrink-0 tabular-nums mr-2"
-                                                      x-text="'5H:' + q.pct + '%' + (q.weeklyPct !== null && q.weeklyPct !== undefined ? ' · W:' + q.weeklyPct + '%' : '')"></span>
-
-                                                <!-- 4. Badges Container: fixed width columns for perfect vertical alignment -->
-                                                <div class="flex items-center gap-1.5 text-[9px] flex-shrink-0 w-36 justify-end">
-                                                    <!-- 5H Badge: fixed width 68px -->
-                                                    <span x-show="q.resetTime"
-                                                          class="w-[68px] h-5 rounded bg-space-800 text-gray-300 border border-space-border/60 flex items-center justify-center gap-1 cursor-help flex-shrink-0"
-                                                          :title="'5H: ' + window.utils.formatTimeUntil(q.resetTime) + (window.utils.formatDateTime(q.resetTime) ? ' (' + window.utils.formatDateTime(q.resetTime) + ')' : '')">
-                                                        <span class="text-gray-400 font-bold">5H</span>
-                                                        <span x-text="window.utils.formatTimeUntil(q.resetTime)"></span>
-                                                    </span>
-                                                    <!-- W Badge: fixed width 76px -->
-                                                    <span x-show="q.weeklyResetTime"
-                                                          class="w-[76px] h-5 rounded bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/25 flex items-center justify-center gap-1 cursor-help flex-shrink-0"
-                                                          :title="'W: ' + window.utils.formatTimeUntil(q.weeklyResetTime) + (window.utils.formatDateTime(q.weeklyResetTime) ? ' (' + window.utils.formatDateTime(q.weeklyResetTime) + ')' : '')">
-                                                        <span class="font-bold text-neon-cyan">W</span>
-                                                        <span x-text="window.utils.formatTimeUntil(q.weeklyResetTime)"></span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <!-- "+N more" expand button -->
-                                        <button x-show="getHiddenCount(row) > 0"
-                                                @click="toggleExpanded(row.modelId)"
-                                                class="text-[10px] font-mono text-neon-purple/70 hover:text-neon-purple transition-colors text-left pl-[104px] py-0.5 cursor-pointer"
-                                                x-text="'+' + getHiddenCount(row) + ' more'"></button>
-                                        <!-- "Show less" collapse button -->
-                                        <button x-show="isExpanded(row.modelId) && !$store.settings.showAllAccounts && row.quotaInfo.length > window.AppConstants.LIMITS.ACCOUNT_BREAKDOWN_LIMIT"
-                                                @click="toggleExpanded(row.modelId)"
-                                                class="text-[10px] font-mono text-gray-500 hover:text-gray-300 transition-colors text-left pl-[104px] py-0.5 cursor-pointer">Show less</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </td>
-                        <td x-show="!$store.settings.compact" class="text-center align-middle font-mono text-xs">
-                            <div class="flex flex-col items-center justify-center gap-1.5 py-0.5">
-                                <!-- 5-Hour Limit Reset (Scheme 1: Dual Tech Badges) -->
-                                <div class="inline-flex items-center gap-2 px-2 py-0.5 rounded-md bg-space-850/90 border border-space-border hover:border-neon-purple/40 transition-colors w-fit tooltip tooltip-left cursor-help"
-                                     :data-tip="window.utils.formatResetTooltip(row.quotaInfo, '5h')">
-                                    <span class="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-neon-purple/20 text-neon-purple leading-none">5H</span>
-                                    <span class="text-xs font-mono font-semibold"
-                                          :class="(row.resetIn && !row.resetIn.includes('h') && !row.resetIn.includes('时') && row.resetIn !== '-' && row.resetIn !== 'READY' && row.resetIn !== '已就绪') ? 'text-neon-purple font-bold' : 'text-gray-200'"
-                                          x-text="row.resetIn"></span>
-                                    <span x-show="row.resetIn && row.resetIn !== '-' && row.resetIn !== 'READY' && row.resetIn !== '已就绪'"
-                                          class="w-1.5 h-1.5 rounded-full bg-neon-purple animate-pulse"></span>
-                                </div>
-                                <!-- Weekly Limit Reset (Scheme 1: Dual Tech Badges with W) -->
-                                <div x-show="row.weeklyResetIn && row.weeklyResetIn !== '-'"
-                                     class="inline-flex items-center gap-2 px-2 py-0.5 rounded-md bg-space-850/90 border border-space-border hover:border-neon-cyan/40 transition-colors w-fit tooltip tooltip-left cursor-help"
-                                     :data-tip="window.utils.formatResetTooltip(row.quotaInfo, 'weekly')">
-                                    <span class="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-neon-cyan/20 text-neon-cyan leading-none">W</span>
-                                    <span class="text-xs font-mono font-semibold text-neon-cyan/90" x-text="row.weeklyResetIn"></span>
-                                </div>
-                            </div>
-                        </td>
-                        <td x-show="!$store.settings.compact" class="text-center align-middle">
-                            <div class="flex flex-col items-center justify-center gap-1.5">
-                                <div class="text-[10px] font-mono text-gray-500 leading-tight opacity-70"
-                                    x-text="$store.global.t('activeCount', {count: row.quotaInfo?.filter(q => q.pct > 0).length || 0})">
-                                </div>
-                                <!-- Account Status Indicators -->
-                                <div class="flex flex-wrap gap-1 justify-center max-w-[160px]" x-data="{ maxVisible: 12 }">
-                                    <template x-if="!row.quotaInfo || row.quotaInfo.length === 0">
-                                        <div class="text-[10px] text-gray-600 italic" x-text="$store.global.t('noData')">No data</div>
-                                    </template>
-                                    <template x-if="row.quotaInfo && row.quotaInfo.length > 0">
-                                        <div class="flex flex-wrap gap-1 justify-center">
-                                            <!-- Visible accounts (limited to maxVisible) -->
-                                            <template x-for="(q, idx) in row.quotaInfo.slice(0, maxVisible)" :key="q.fullEmail">
-                                                <div class="tooltip tooltip-left"
-                                                     :data-tip="`${Redact.email(q.fullEmail)} (5H:${q.pct}%` + (q.weeklyPct !== null && q.weeklyPct !== undefined ? ` · W:${q.weeklyPct}%)` : ')') + (q.thresholdPct > 0 ? ` · min: ${q.thresholdPct}%` : '')">
-                                                    <div class="w-2.5 h-2.5 rounded-[2px] transition-all hover:scale-125 cursor-help"
-                                                        :class="q.pct > 50 ? 'bg-neon-green opacity-80' : (q.pct > 0 ? 'bg-yellow-500 opacity-80' : 'bg-red-900 opacity-50')">
-                                                    </div>
-                                                </div>
-                                            </template>
-                                            <!-- Overflow indicator -->
-                                            <template x-if="row.quotaInfo.length > maxVisible">
-                                                <div class="tooltip tooltip-left"
-                                                     :data-tip="row.quotaInfo.slice(maxVisible).map(q => `${Redact.email(q.fullEmail)} (5H:${q.pct}%` + (q.weeklyPct !== null && q.weeklyPct !== undefined ? ` · W:${q.weeklyPct}%)` : ')') + (q.thresholdPct > 0 ? ` · min: ${q.thresholdPct}%` : '')).join('\n')">
-                                                    <div class="w-2.5 h-2.5 rounded-[2px] bg-gray-700/50 border border-gray-600 flex items-center justify-center cursor-help hover:bg-gray-600/70 transition-colors">
-                                                        <span class="text-[6px] text-gray-400 font-bold leading-none"
-                                                              x-text="`+${row.quotaInfo.length - maxVisible}`"></span>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="text-center align-middle !pr-4">
-                            <div class="flex items-center justify-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                <!-- Pin Toggle -->
-                                <button class="btn btn-xs btn-circle transition-colors"
-                                    :class="row.pinned ? 'bg-neon-purple/20 text-neon-purple border-neon-purple/50 hover:bg-neon-purple/30' : 'btn-ghost text-gray-600 hover:text-gray-300'"
-                                    @click="await updateModelConfig(row.modelId, { pinned: !row.pinned })"
-                                    @keydown.enter="await updateModelConfig(row.modelId, { pinned: !row.pinned })"
-                                    @keydown.space.prevent="await updateModelConfig(row.modelId, { pinned: !row.pinned })"
-                                    :title="$store.global.t('pinToTop')"
-                                    :aria-label="row.pinned ? 'Unpin model ' + row.modelId : 'Pin model ' + row.modelId + ' to top'"
-                                    :aria-pressed="row.pinned ? 'true' : 'false'"
-                                    tabindex="0">
-                                    <svg x-show="row.pinned" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5"
-                                        viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
-                                    </svg>
-                                    <svg x-show="!row.pinned" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5"
-                                        fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                                    </svg>
-                                </button>
-                                <!-- Hide Toggle -->
-                                <button class="btn btn-xs btn-circle transition-colors"
-                                    :class="row.hidden ? 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30' : 'btn-ghost text-gray-400 hover:text-white'"
-                                    @click="await updateModelConfig(row.modelId, { hidden: !row.hidden })"
-                                    @keydown.enter="await updateModelConfig(row.modelId, { hidden: !row.hidden })"
-                                    @keydown.space.prevent="await updateModelConfig(row.modelId, { hidden: !row.hidden })"
-                                    :title="$store.global.t('toggleVisibility')"
-                                    :aria-label="row.hidden ? 'Show model ' + row.modelId : 'Hide model ' + row.modelId"
-                                    :aria-pressed="row.hidden ? 'true' : 'false'"
-                                    tabindex="0">
-                                    <svg x-show="!row.hidden" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
-                                        fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                    <svg x-show="row.hidden" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
-                                        fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </td>
+        <div class="m3-table-container">
+            <table class="m3-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;" x-text="$store.global.t('stat')">Stat</th>
+                        <th style="min-width: 180px;" x-text="$store.global.t('modelIdentity')">Model Identity</th>
+                        <th style="min-width: 420px;" x-text="$store.global.t('accountQuotasAndReset')">各账号配额与刷新明细 (Account Quotas & Reset)</th>
+                        <th style="width: 90px; text-align: right;" x-text="$store.global.t('actions')">Actions</th>
                     </tr>
-                </template>
-                <!-- Loading -->
-                <tr x-show="$store.data.loading && !$store.data.quotaRows.length">
-                    <td :colspan="$store.settings.compact ? 4 : 6" class="h-64 text-center">
-                        <div class="flex flex-col items-center justify-center gap-3">
-                            <span class="loading loading-bars loading-md text-neon-purple"></span>
-                            <span class="text-xs font-mono text-gray-600 animate-pulse"
-                                x-text="$store.global.t('establishingUplink')">ESTABLISHING
-                                UPLINK...</span>
-                        </div>
-                    </td>
-                </tr>
-                <!-- Empty State -->
-                <tr x-show="!$store.data.initialLoad && $store.data.quotaRows.length === 0">
-                    <td :colspan="$store.settings.compact ? 4 : 6" class="py-16 text-center">
-                        <div class="flex flex-col items-center gap-4 max-w-lg mx-auto">
-                            <svg class="w-20 h-20 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                      d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                            </svg>
-                            <h3 class="text-xl font-semibold text-gray-400" x-text="$store.global.t('noSignal')">
-                                NO SIGNAL DETECTED
-                            </h3>
-                            <p class="text-sm text-gray-600 max-w-md leading-relaxed">
-                                No model data available. Add accounts to see available models and quota information.
-                            </p>
-                            <button class="btn bg-neon-purple hover:bg-purple-600 border-none text-white btn-sm gap-2 shadow-lg shadow-neon-purple/20"
-                                @click="$store.global.activeTab = 'accounts'">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span x-text="$store.global.t('goToAccounts')">Go to Accounts</span>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <template x-for="row in $store.data.quotaRows" :key="row.modelId">
+                        <tr :style="row.hidden ? 'opacity: 0.5;' : ''">
+                            <!-- Status dot -->
+                            <td style="vertical-align: top; padding-top: 14px;">
+                                <span class="m3-status-dot" :class="row.avgQuota > 0 ? 'connected' : 'disconnected'"></span>
+                            </td>
+
+                            <!-- Model Identity -->
+                            <td style="vertical-align: top; padding-top: 14px;">
+                                <div class="flex-col gap-1">
+                                    <span class="font-bold text-sm" x-text="row.modelId"></span>
+                                    <div class="flex-row items-center gap-2">
+                                        <span class="text-xs font-mono" style="color: var(--text-secondary);" x-text="row.family"></span>
+                                        <span class="m3-status-pill" style="font-size: 10px; padding: 1px 6px;" x-text="$store.global.t('averageColon', { pct: row.avgQuota })"></span>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- 各账号配额与重置时间合并列 (Account Quotas & Reset) -->
+                            <td style="vertical-align: middle;">
+                                <div class="flex-col gap-2" style="max-width: 640px;">
+                                    <template x-for="q in getVisibleAccounts(row)" :key="q.fullEmail">
+                                        <div class="flex-row items-center text-xs font-mono" style="padding: 6px 12px; background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border-subtle); gap: 10px; flex-wrap: nowrap;">
+                                            <!-- Account name (固定宽与截断保护，杜绝重叠) -->
+                                            <div class="flex-row items-center gap-1.5" style="width: 125px; min-width: 125px; flex-shrink: 0; overflow: hidden;">
+                                                <span class="material-symbols-outlined" style="font-size: 15px; color: var(--text-secondary); flex-shrink: 0;">person</span>
+                                                <span class="truncate font-semibold" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="q.email" :title="q.fullEmail"></span>
+                                            </div>
+
+                                            <!-- Quota bar (弹性填充，各行两端绝对对齐) -->
+                                            <div style="flex: 1; min-width: 80px; display: flex; align-items: center;">
+                                                <md-linear-progress style="width: 100%;" :value="q.pct / 100"></md-linear-progress>
+                                            </div>
+
+                                            <!-- Quota percentage (固定 42px 等宽数字右对齐) -->
+                                            <span style="width: 42px; min-width: 42px; flex-shrink: 0; font-weight: bold; text-align: right; font-variant-numeric: tabular-nums;"
+                                                  :style="{ color: q.pct > 50 ? '#22c55e' : (q.pct > 0 ? '#eab308' : 'var(--md-sys-color-error)') }" 
+                                                  x-text="q.pct + '%'"></span>
+
+                                            <!-- Reset time badges (固定容器保证进度条长度完全一致，white-space 防止折行) -->
+                                            <div class="flex-row items-center gap-1.5" style="width: 196px; min-width: 196px; flex-shrink: 0;">
+                                                <!-- 5H Reset (固定 92px，单行防折行) -->
+                                                <div class="flex-row items-center justify-center gap-1" style="width: 92px; padding: 2px 4px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border-subtle); box-sizing: border-box; white-space: nowrap;" :title="q.resetTime ? window.utils.formatDateTime(q.resetTime) : ''">
+                                                    <span style="color: var(--text-secondary); font-size: 10px; font-weight: 600;" x-text="$store.global.t('fiveHourColon')">5H:</span>
+                                                    <span style="font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;" :style="{ color: q.resetTime ? 'var(--md-sys-color-primary)' : 'var(--text-secondary)' }" x-text="window.utils.formatTimeUntil(q.resetTime)"></span>
+                                                </div>
+
+                                                <!-- Weekly Reset (固定 98px，单行防折行) -->
+                                                <div x-show="q.weeklyResetTime" class="flex-row items-center justify-center gap-1" style="width: 98px; padding: 2px 4px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border-subtle); box-sizing: border-box; white-space: nowrap;" :title="q.weeklyResetTime ? window.utils.formatDateTime(q.weeklyResetTime) : ''">
+                                                    <span style="color: var(--text-secondary); font-size: 10px; font-weight: 600;" x-text="$store.global.t('weekColon')">周:</span>
+                                                    <span style="font-weight: 600; color: var(--md-sys-color-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap;" x-text="window.utils.formatTimeUntil(q.weeklyResetTime)"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Expand / Collapse -->
+                                    <div x-show="getHiddenCount(row) > 0" class="text-xs font-mono" style="color: var(--md-sys-color-primary); cursor: pointer; padding-left: 4px;" @click="toggleExpanded(row.modelId)">
+                                        <span x-text="'+ ' + getHiddenCount(row) + ' ' + ($store.global.t('moreAccounts') || 'more accounts...')"></span>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Actions -->
+                            <td style="text-align: right; vertical-align: top; padding-top: 10px;">
+                                <div class="flex-row items-center justify-end gap-1">
+                                    <!-- Pin -->
+                                    <md-icon-button @click="await updateModelConfig(row.modelId, { pinned: !row.pinned })" :title="row.pinned ? $store.global.t('unpinModel') : $store.global.t('pinModel')">
+                                        <span class="material-symbols-outlined" :style="row.pinned ? 'color: var(--md-sys-color-primary);' : 'color: var(--text-secondary);'">
+                                            push_pin
+                                        </span>
+                                    </md-icon-button>
+                                    <!-- Hide -->
+                                    <md-icon-button @click="await updateModelConfig(row.modelId, { hidden: !row.hidden })" :title="row.hidden ? $store.global.t('unhideModel') : $store.global.t('hideModel')">
+                                        <span class="material-symbols-outlined" :style="row.hidden ? 'color: var(--md-sys-color-error);' : 'color: var(--text-secondary);'">
+                                            visibility
+                                        </span>
+                                    </md-icon-button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        </div>
     </div>
-</div>
 </div>
