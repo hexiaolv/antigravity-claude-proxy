@@ -6,6 +6,21 @@
 window.Components = window.Components || {};
 
 window.Components.models = () => ({
+    // View mode: 'categories' (Google style grouped view) or 'details' (individual models table)
+    viewMode: 'categories',
+
+    getProgressColor(pct) {
+        if (pct >= 60) return 'text-emerald-500';
+        if (pct >= 25) return 'text-amber-500';
+        return 'text-rose-500';
+    },
+
+    getProgressBg(pct) {
+        if (pct >= 60) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+        if (pct >= 25) return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+        return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+    },
+
     // Color palette for per-account threshold markers
     thresholdColors: [
         { bg: '#eab308', shadow: 'rgba(234,179,8,0.5)' },    // yellow

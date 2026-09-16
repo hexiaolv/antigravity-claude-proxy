@@ -17,10 +17,56 @@ document.addEventListener('alpine:init', () => {
         logExport: true,
         healthInspector: true,
         healthInspectorOpen: false,
+        theme: 'system', // 'system' | 'light' | 'dark'
         port: 8080, // Display only
 
         init() {
             this.loadSettings();
+            this.applyTheme(this.theme);
+
+            // Listen for system theme changes
+            if (window.matchMedia) {
+                const mq = window.matchMedia('(prefers-color-scheme: dark)');
+                const handler = () => {
+                    if (this.theme === 'system') this.applyTheme('system');
+                };
+                if (mq.addEventListener) mq.addEventListener('change', handler);
+                else if (mq.addListener) mq.addListener(handler);
+            }
+        },
+
+        setTheme(newTheme) {
+            if (['system', 'light', 'dark'].includes(newTheme)) {
+                this.theme = newTheme;
+                this.applyTheme(newTheme);
+                this.saveSettings(true);
+            }
+        },
+
+        toggleThemeQuick() {
+            const cycle = ['system', 'light', 'dark'];
+            const nextIdx = (cycle.indexOf(this.theme) + 1) % cycle.length;
+            this.setTheme(cycle[nextIdx]);
+        },
+
+        applyTheme(theme = this.theme) {
+            let isDark = true;
+            if (theme === 'system') {
+                isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } else {
+                isDark = theme === 'dark';
+            }
+
+            const root = document.documentElement;
+            if (isDark) {
+                root.classList.remove('light');
+                root.classList.add('dark');
+                root.setAttribute('data-theme', 'antigravity');
+            } else {
+                root.classList.remove('dark');
+                root.classList.add('light');
+                root.setAttribute('data-theme', 'antigravity-light');
+            }
         },
 
         // Call this method when toggling settings in the UI
@@ -57,7 +103,8 @@ document.addEventListener('alpine:init', () => {
                 debugLogging: this.debugLogging,
                 logExport: this.logExport,
                 healthInspector: this.healthInspector,
-                healthInspectorOpen: this.healthInspectorOpen
+                healthInspectorOpen: this.healthInspectorOpen,
+                theme: this.theme
             };
             localStorage.setItem('antigravity_settings', JSON.stringify(toSave));
 

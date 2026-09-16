@@ -62,6 +62,56 @@ window.utils = {
         return `${mins}${mSuffix}`;
     },
 
+    formatFullCountdown(isoTime) {
+        if (!isoTime) return '';
+        const store = Alpine.store('global');
+        const isZh = store?.lang === 'zh';
+        const diff = new Date(isoTime) - new Date();
+        if (diff <= 0) return isZh ? '已完全刷新' : 'fully refreshed';
+
+        const mins = Math.max(1, Math.floor(diff / 60000));
+        const hrs = Math.floor(mins / 60);
+        const days = Math.floor(hrs / 24);
+        const remHrs = hrs % 24;
+        const remMins = mins % 60;
+
+        if (isZh) {
+            if (days > 0) return `${days} 天 ${remHrs} 小时`;
+            if (hrs > 0) return remMins > 0 ? `${hrs} 小时 ${remMins} 分钟` : `${hrs} 小时`;
+            return `${mins} 分钟`;
+        }
+
+        if (days > 0) {
+            const dText = days === 1 ? '1 day' : `${days} days`;
+            const hText = remHrs === 1 ? '1 hour' : `${remHrs} hours`;
+            return `${dText}, ${hText}`;
+        }
+        if (hrs > 0) {
+            const hText = hrs === 1 ? '1 hour' : `${hrs} hours`;
+            if (remMins > 0) {
+                const mText = remMins === 1 ? '1 minute' : `${remMins} minutes`;
+                return `${hText}, ${mText}`;
+            }
+            return hText;
+        }
+        return mins === 1 ? '1 minute' : `${mins} minutes`;
+    },
+
+    formatRefreshNotice(windowType, pct, resetTime) {
+        const store = Alpine.store('global');
+        const isZh = store?.lang === 'zh';
+        if (pct >= 100 || !resetTime) {
+            return isZh ? '当前额度充足，随时可用。' : 'Quota limit is full, ready to use.';
+        }
+        const countdown = this.formatFullCountdown(resetTime);
+        if (isZh) {
+            const period = windowType === 'weekly' ? '周限额' : '5小时限额';
+            return `您已使用部分${period}，将于 ${countdown} 后完全刷新。`;
+        }
+        const period = windowType === 'weekly' ? 'weekly limit' : '5-hour limit';
+        return `You have used some of your ${period}, it will fully refresh in ${countdown}.`;
+    },
+
     formatDateTime(isoTime) {
         if (!isoTime) return '';
         const d = new Date(isoTime);

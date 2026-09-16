@@ -12,6 +12,32 @@
     <!-- Alpine.js must be deferred so stores register their listeners first -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+    <!-- Theme initialization (Prevent FOUC) -->
+    <script>
+        (function() {
+            try {
+                var saved = JSON.parse(localStorage.getItem('antigravity_settings') || '{}');
+                var theme = saved.theme || 'system';
+                var isDark = true;
+                if (theme === 'system') {
+                    isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                } else {
+                    isDark = theme === 'dark';
+                }
+                var root = document.documentElement;
+                if (isDark) {
+                    root.classList.remove('light');
+                    root.classList.add('dark');
+                    root.setAttribute('data-theme', 'antigravity');
+                } else {
+                    root.classList.remove('dark');
+                    root.classList.add('light');
+                    root.setAttribute('data-theme', 'antigravity-light');
+                }
+            } catch(e) {}
+        })();
+    </script>
+
     <!-- Compiled Tailwind CSS (includes DaisyUI) -->
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -72,7 +98,7 @@
             </button>
 
             <div
-                class="w-8 h-8 rounded bg-gradient-to-br from-neon-purple to-blue-600 flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+                class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold shadow-sm shadow-blue-500/20">
                 AG</div>
             <div class="flex flex-col">
                 <span class="text-sm font-bold tracking-wide text-white"
@@ -99,7 +125,24 @@
                     x-text="connectionStatus === 'connected' ? $store.global.t('online') : (connectionStatus === 'disconnected' ? $store.global.t('offline') : $store.global.t('connecting'))"></span>
             </div>
 
-            <div class="h-4 w-px bg-space-border"></div>
+            <!-- Theme Toggle Button -->
+            <button type="button" class="btn btn-ghost btn-xs btn-square text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                @click="$store.settings.toggleThemeQuick()" 
+                :title="$store.global.t('theme') + ': ' + $store.global.t('theme' + $store.settings.theme.charAt(0).toUpperCase() + $store.settings.theme.slice(1))"
+                aria-label="Toggle theme">
+                <!-- System Icon -->
+                <svg x-show="$store.settings.theme === 'system'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <!-- Light Icon (Sun) -->
+                <svg x-show="$store.settings.theme === 'light'" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <!-- Dark Icon (Moon) -->
+                <svg x-show="$store.settings.theme === 'dark'" class="w-4 h-4 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
 
             <!-- Refresh Button -->
             <button type="button" class="btn btn-ghost btn-xs btn-square text-gray-400 hover:text-white hover:bg-white/5"

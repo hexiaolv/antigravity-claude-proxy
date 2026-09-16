@@ -35,6 +35,23 @@ document.addEventListener('alpine:init', () => {
             sortAsc: true
         },
 
+        // Category-level quotas (Gemini / Claude&GPT)
+        categorySummary: {
+            gemini: {
+                fiveHour: { avgPct: 100, earliestReset: null, earliestAccount: null, noticeText: '' },
+                weekly: { avgPct: 100, earliestReset: null, earliestAccount: null, noticeText: '' },
+                healthyCount: 0,
+                totalCount: 0
+            },
+            claude: {
+                fiveHour: { avgPct: 100, earliestReset: null, earliestAccount: null, noticeText: '' },
+                weekly: { avgPct: 100, earliestReset: null, earliestAccount: null, noticeText: '' },
+                healthyCount: 0,
+                totalCount: 0
+            }
+        },
+        accountCategoryCards: [],
+
         // Settings for calculation
         // We need to access global settings? Or duplicate?
         // Let's assume settings are passed or in another store.
@@ -407,8 +424,196 @@ document.addEventListener('alpine:init', () => {
                 return sortAsc ? valA - valB : valB - valA;
             });
 
-            // Trigger Dashboard Update if active
-            // Ideally dashboard watches this store.
+            // Recompute category summaries and per-account cards
+            this.computeCategorySummaries();
+        },
+
+        extractAccountCategory(acc) {
+            if (!acc) return null;
+            const res = {
+                email: acc.email,
+                displayEmail: window.Redact ? window.Redact.email(acc.email) : acc.email,
+                shortEmail: (acc.email || '').split('@')[0],
+                tier: acc.subscription?.tier || 'free',
+                projectId: acc.subscription?.projectId || '',
+                enabled: acc.enabled !== false,
+                gemini: {
+                    displayName: 'Gemini Models',
+                    fiveHour: { pct: 100, remainingFraction: 1, resetTime: null, noticeText: '' },
+                    weekly: { pct: 100, remainingFraction: 1, resetTime: null, noticeText: '' }
+                },
+                claude: {
+                    displayName: 'Claude and GPT models',
+                    fiveHour: { pct: 100, remainingFraction: 1, resetTime: null, noticeText: '' },
+                    weekly: { pct: 100, remainingFraction: 1, resetTime: null, noticeText: '' }
+                }
+            };
+
+            const groups = acc.quotaSummary?.groups || acc.quota?.summary?.groups;
+            if (Array.isArray(groups) && groups.length > 0) {
+                groups.forEach(g => {
+                    const gName = (g.displayName || '').toLowerCase();
+                    const isGemini = gName.includes('gemini');
+                    const isClaude = gName.includes('claude') || gName.includes('gpt');
+                    const targetCategory = isGemini ? res.gemini : (isClaude ? res.claude : null);
+                    if (!targetCategory) return;
+
+                    (g.buckets || []).forEach(b => {
+                        const isWeekly = b.window === 'weekly' || (b.bucketId && b.bucketId.includes('weekly'));
+                        const targetBucket = isWeekly ? targetCategory.weekly : targetCategory.fiveHour;
+                        const frac = typeof b.remainingFraction === 'number' ? b.remainingFraction : 1;
+                        const pct = Math.round(frac * 100);
+                        targetBucket.remainingFraction = frac;
+                        targetBucket.pct = pct;
+                        targetBucket.resetTime = b.resetTime || null;
+                        targetBucket.noticeText = window.utils.formatRefreshNotice(isWeekly ? 'weekly' : '5h', pct, b.resetTime);
+                    });
+                });
+            } else {
+                // Fallback using individual model limits
+                const geminiFractions = [];
+                const claudeFractions = [];
+                let geminiReset = null;
+                let claudeReset = null;
+
+                Object.entries(acc.limits || {}).forEach(([modelId, limit]) => {
+                    if (!limit || limit.remainingFraction === null || limit.remainingFraction === undefined) return;
+                    const isClaude = modelId.includes('claude') || modelId.includes('gpt');
+                    if (isClaude) {
+                        claudeFractions.push(limit.remainingFraction);
+                        if (limit.resetTime && (!claudeReset || new Date(limit.resetTime) < new Date(claudeReset))) {
+                            claudeReset = limit.resetTime;
+                        }
+                    } else if (modelId.includes('gemini')) {
+                        geminiFractions.push(limit.remainingFraction);
+                        if (limit.resetTime && (!geminiReset || new Date(limit.resetTime) < new Date(geminiReset))) {
+                            geminiReset = limit.resetTime;
+                        }
+                    }
+                });
+
+                if (geminiFractions.length > 0) {
+                    const avg = geminiFractions.reduce((a, b) => a + b, 0) / geminiFractions.length;
+                    const pct = Math.round(avg * 100);
+                    res.gemini.fiveHour = {
+                        pct,
+                        remainingFraction: avg,
+                        resetTime: geminiReset,
+                        noticeText: window.utils.formatRefreshNotice('5h', pct, geminiReset)
+                    };
+                }
+                if (claudeFractions.length > 0) {
+                    const avg = claudeFractions.reduce((a, b) => a + b, 0) / claudeFractions.length;
+                    const pct = Math.round(avg * 100);
+                    res.claude.fiveHour = {
+                        pct,
+                        remainingFraction: avg,
+                        resetTime: claudeReset,
+                        noticeText: window.utils.formatRefreshNotice('5h', pct, claudeReset)
+                    };
+                }
+            }
+
+            return res;
+        },
+
+        computeCategorySummaries() {
+            const accounts = this.accounts || [];
+            const cards = [];
+            const summary = {
+                gemini: {
+                    fiveHour: { avgPct: 100, earliestReset: null, earliestAccount: null, noticeText: '' },
+                    weekly: { avgPct: 100, earliestReset: null, earliestAccount: null, noticeText: '' },
+                    healthyCount: 0,
+                    totalCount: 0
+                },
+                claude: {
+                    fiveHour: { avgPct: 100, earliestReset: null, earliestAccount: null, noticeText: '' },
+                    weekly: { avgPct: 100, earliestReset: null, earliestAccount: null, noticeText: '' },
+                    healthyCount: 0,
+                    totalCount: 0
+                }
+            };
+
+            let g5hSum = 0, g5hCount = 0;
+            let gWkSum = 0, gWkCount = 0;
+            let c5hSum = 0, c5hCount = 0;
+            let cWkSum = 0, cWkCount = 0;
+
+            accounts.forEach(acc => {
+                if (acc.enabled === false) return;
+                const card = this.extractAccountCategory(acc);
+                if (!card) return;
+
+                // Account filter
+                if (this.filters.account !== 'all' && acc.email !== this.filters.account) return;
+
+                // Search filter
+                if (this.filters.search) {
+                    const term = this.filters.search.toLowerCase();
+                    const matches = acc.email.toLowerCase().includes(term) || (acc.subscription?.projectId || '').toLowerCase().includes(term);
+                    if (!matches) return;
+                }
+
+                cards.push(card);
+
+                // Aggregate Gemini
+                summary.gemini.totalCount++;
+                if (card.gemini.fiveHour.pct > 0 || card.gemini.weekly.pct > 0) summary.gemini.healthyCount++;
+
+                g5hSum += card.gemini.fiveHour.pct;
+                g5hCount++;
+                if (card.gemini.fiveHour.resetTime) {
+                    if (!summary.gemini.fiveHour.earliestReset || new Date(card.gemini.fiveHour.resetTime) < new Date(summary.gemini.fiveHour.earliestReset)) {
+                        summary.gemini.fiveHour.earliestReset = card.gemini.fiveHour.resetTime;
+                        summary.gemini.fiveHour.earliestAccount = card.shortEmail;
+                    }
+                }
+
+                gWkSum += card.gemini.weekly.pct;
+                gWkCount++;
+                if (card.gemini.weekly.resetTime) {
+                    if (!summary.gemini.weekly.earliestReset || new Date(card.gemini.weekly.resetTime) < new Date(summary.gemini.weekly.earliestReset)) {
+                        summary.gemini.weekly.earliestReset = card.gemini.weekly.resetTime;
+                        summary.gemini.weekly.earliestAccount = card.shortEmail;
+                    }
+                }
+
+                // Aggregate Claude
+                summary.claude.totalCount++;
+                if (card.claude.fiveHour.pct > 0 || card.claude.weekly.pct > 0) summary.claude.healthyCount++;
+
+                c5hSum += card.claude.fiveHour.pct;
+                c5hCount++;
+                if (card.claude.fiveHour.resetTime) {
+                    if (!summary.claude.fiveHour.earliestReset || new Date(card.claude.fiveHour.resetTime) < new Date(summary.claude.fiveHour.earliestReset)) {
+                        summary.claude.fiveHour.earliestReset = card.claude.fiveHour.resetTime;
+                        summary.claude.fiveHour.earliestAccount = card.shortEmail;
+                    }
+                }
+
+                cWkSum += card.claude.weekly.pct;
+                cWkCount++;
+                if (card.claude.weekly.resetTime) {
+                    if (!summary.claude.weekly.earliestReset || new Date(card.claude.weekly.resetTime) < new Date(summary.claude.weekly.earliestReset)) {
+                        summary.claude.weekly.earliestReset = card.claude.weekly.resetTime;
+                        summary.claude.weekly.earliestAccount = card.shortEmail;
+                    }
+                }
+            });
+
+            summary.gemini.fiveHour.avgPct = g5hCount > 0 ? Math.round(g5hSum / g5hCount) : 100;
+            summary.gemini.fiveHour.noticeText = window.utils.formatRefreshNotice('5h', summary.gemini.fiveHour.avgPct, summary.gemini.fiveHour.earliestReset);
+            summary.gemini.weekly.avgPct = gWkCount > 0 ? Math.round(gWkSum / gWkCount) : 100;
+            summary.gemini.weekly.noticeText = window.utils.formatRefreshNotice('weekly', summary.gemini.weekly.avgPct, summary.gemini.weekly.earliestReset);
+
+            summary.claude.fiveHour.avgPct = c5hCount > 0 ? Math.round(c5hSum / c5hCount) : 100;
+            summary.claude.fiveHour.noticeText = window.utils.formatRefreshNotice('5h', summary.claude.fiveHour.avgPct, summary.claude.fiveHour.earliestReset);
+            summary.claude.weekly.avgPct = cWkCount > 0 ? Math.round(cWkSum / cWkCount) : 100;
+            summary.claude.weekly.noticeText = window.utils.formatRefreshNotice('weekly', summary.claude.weekly.avgPct, summary.claude.weekly.earliestReset);
+
+            this.categorySummary = summary;
+            this.accountCategoryCards = cards;
         },
 
         setSort(col) {

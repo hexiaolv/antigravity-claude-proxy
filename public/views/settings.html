@@ -80,6 +80,20 @@
                         </select>
                     </div>
 
+                    <!-- Theme -->
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text text-gray-300" x-text="$store.global.t('theme')">Theme</span>
+                        </label>
+                        <select
+                            class="select select-bordered select-sm w-full bg-space-800 border-space-border/50 text-gray-300 focus:border-neon-purple focus:ring-1 focus:ring-neon-purple/50 font-medium transition-all !py-0 leading-tight"
+                            :value="$store.settings.theme" @change="$store.settings.setTheme($event.target.value)">
+                            <option value="system" x-text="$store.global.t('themeSystem')">Auto (Follow System)</option>
+                            <option value="dark" x-text="$store.global.t('themeDark')">Dark Mode</option>
+                            <option value="light" x-text="$store.global.t('themeLight')">Light Mode</option>
+                        </select>
+                    </div>
+
                     <!-- Polling Interval -->
                     <div class="form-control">
                         <label class="label">
@@ -181,8 +195,8 @@
                         :class="$store.settings.showConfigWarning ? 'border-amber-500/50 bg-amber-500/5 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'border-space-border/50'">
                         <div class="flex items-center justify-between">
                             <div class="flex flex-col gap-1">
-                                <span class="label-text font-medium transition-colors"
-                                    :class="$store.settings.showConfigWarning ? 'text-amber-400' : 'text-gray-300'"
+                                <span class="label-text font-semibold transition-colors"
+                                    :class="$store.settings.showConfigWarning ? 'text-amber-700 dark:text-amber-400' : 'text-gray-300'"
                                     x-text="$store.global.t('showConfigWarning')">Show Config Warning</span>
                                 <span class="text-xs text-gray-500" x-text="$store.global.t('showConfigWarningDesc')">Display a warning on Dashboard when Claude CLI config doesn't match preset.</span>
                             </div>
