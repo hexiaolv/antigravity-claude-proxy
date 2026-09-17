@@ -25,6 +25,10 @@ const FALLBACK_USER_AGENT_VERSION = process.env.FALLBACK_ANTIGRAVITY_VERSION || 
 // Can be overridden via ANTIGRAVITY_CLIENT_VERSION_FALLBACK env var
 const FALLBACK_CLIENT_VERSION = process.env.ANTIGRAVITY_CLIENT_VERSION_FALLBACK || '1.110.0';
 
+// Bundle names, newest packaging first: the "Antigravity IDE" build carries
+// product.json, the plain "Antigravity" one ships only the .lproj/asar payload.
+const APP_NAMES = ['Antigravity IDE', 'Antigravity'];
+
 let cachedUserAgent = null;
 let cachedClientVersion = null;
 let cachedProductJson = undefined; // undefined = not yet attempted
@@ -52,27 +56,30 @@ function isVersionHigher(v1, v2) {
  */
 function getProductJsonPaths() {
     const os = platform();
-    const paths = [];
+    const suffix = join('resources', 'app', 'product.json');
 
     if (os === 'darwin') {
-        paths.push('/Applications/Antigravity.app/Contents/Resources/app/product.json');
-        paths.push(join(homedir(), 'Applications', 'Antigravity.app', 'Contents', 'Resources', 'app', 'product.json'));
-    } else if (os === 'win32') {
-        const localAppData = process.env.LOCALAPPDATA;
-        const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-        if (localAppData) {
-            paths.push(join(localAppData, 'Programs', 'Antigravity', 'resources', 'app', 'product.json'));
-        }
-        paths.push(join(programFiles, 'Antigravity', 'resources', 'app', 'product.json'));
-    } else {
-        paths.push('/usr/share/antigravity/resources/app/product.json');
-        paths.push('/opt/antigravity/resources/app/product.json');
-        paths.push('/opt/Antigravity/resources/app/product.json');
-        paths.push(join(homedir(), '.local', 'share', 'antigravity', 'resources', 'app', 'product.json'));
-        paths.push('/snap/antigravity/current/resources/app/product.json');
+        return ['/Applications', join(homedir(), 'Applications')]
+            .flatMap(dir => APP_NAMES.map(app => join(dir, `${app}.app`, 'Contents', suffix)));
     }
 
-    return paths;
+    if (os === 'win32') {
+        const roots = [
+            process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Programs'),
+            process.env.ProgramFiles || 'C:\\Program Files'
+        ].filter(Boolean);
+        return roots.flatMap(root => APP_NAMES.map(app => join(root, app, suffix)));
+    }
+
+    return [
+        '/usr/share/antigravity-ide/resources/app/product.json',
+        '/usr/share/antigravity/resources/app/product.json',
+        '/opt/antigravity-ide/resources/app/product.json',
+        '/opt/antigravity/resources/app/product.json',
+        '/opt/Antigravity/resources/app/product.json',
+        join(homedir(), '.local/share/antigravity/resources/app/product.json'),
+        '/snap/antigravity/current/resources/app/product.json'
+    ];
 }
 
 /**
@@ -200,10 +207,11 @@ export function generateSmartUserAgent() {
  * MacOS-specific version detection using plutil
  */
 function getVersionMacos() {
-    const appPath = '/Applications/Antigravity.app';
-    const plistPath = join(appPath, 'Contents/Info.plist');
+    const plistPath = ['/Applications', join(homedir(), 'Applications')]
+        .flatMap(dir => APP_NAMES.map(app => join(dir, `${app}.app`, 'Contents', 'Info.plist')))
+        .find(existsSync);
 
-    if (!existsSync(plistPath)) return null;
+    if (!plistPath) return null;
 
     try {
         const version = execSync(`plutil -extract CFBundleShortVersionString raw "${plistPath}"`, { encoding: 'utf8' }).trim();

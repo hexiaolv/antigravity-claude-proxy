@@ -27,7 +27,11 @@ import { deriveSessionId } from './session-manager.js';
 const DEFAULT_IDENTITY_SCRUB = [
     ['Nous Research', 'the assistant team'],
     ['Hermes Agent', 'the assistant'],
-    ['Hermes', 'the assistant']
+    ['Hermes', 'the assistant'],
+    // Claude Code Desktop sends its Anthropic billing marker as a system part;
+    // cloudcode-pa answers that header name with the opaque 429 above. Verified
+    // live: renaming it returns 200, the values are harmless.
+    ['x-anthropic-billing-header', 'x-client-billing-header']
 ];
 
 function parseIdentityScrubEnv(raw) {
@@ -42,18 +46,19 @@ function parseIdentityScrubEnv(raw) {
         .filter((rule) => rule && rule[0].length > 0);
 }
 
+// Compiled once. Case-insensitive because the marker that matters is an HTTP
+// header name, and those are case-insensitive over the wire.
 const IDENTITY_SCRUB_RULES = [
     ...DEFAULT_IDENTITY_SCRUB,
     ...parseIdentityScrubEnv(process.env.ANTIGRAVITY_SCRUB_IDENTITY)
-];
+].map(([term, replacement]) => [new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replacement]);
 
 function scrubClientIdentity(text) {
     if (typeof text !== 'string') return text;
-    let out = text;
-    for (const [term, replacement] of IDENTITY_SCRUB_RULES) {
-        out = out.split(term).join(replacement);
+    for (const [pattern, replacement] of IDENTITY_SCRUB_RULES) {
+        text = text.replace(pattern, replacement);
     }
-    return out;
+    return text;
 }
 
 /**
