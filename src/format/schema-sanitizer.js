@@ -679,10 +679,13 @@ export function cleanSchema(schema) {
         result.type = toGoogleType(result.type);
     }
 
-    // Enforce type/keyword consistency (Google validates this strictly):
+    // Phase 6: Google validates type/keyword consistency strictly:
     // "properties"/"required" are only allowed on OBJECT, "items" only on ARRAY.
     // Schema unions (e.g. type: ["string","object"]) are flattened above by picking
-    // one type, which can leave keywords behind from the discarded variant.
+    // one type, and anyOf/oneOf flattening can pick a non-object option while the
+    // parent still carried properties/required - so both can survive on a node
+    // whose type resolved to something else. Guarded on a string type so a node
+    // that carries properties without any type keeps them.
     if (typeof result.type === 'string') {
         if (result.type !== 'OBJECT') {
             delete result.properties;
@@ -693,9 +696,34 @@ export function cleanSchema(schema) {
         }
     }
 
-    // Ensure ARRAY types always have an items schema
-    if (result.type === 'ARRAY' && !result.items) {
-        result.items = { type: 'STRING', description: 'Any type (fallback)' };
+    // Phase 7: Google's protobuf-based schema requires every ARRAY type to
+    // declare a single object `items` schema. Plain JSON Schema allows this
+    // to be omitted (`{ type: 'array' }` = "array of anything"), boolean
+    // (`items: true` = "any"), or tuple-form (`items: [...]`) - none of
+    // which the Cloud Code API accepts; it rejects the first two with
+    // "items: missing field" and the tuple form with "Proto field is not
+    // repeating, cannot start list". This runs after the items/properties
+    // recursion above (and after the type conversion), so it applies at every
+    // nesting depth - fixing issue #368 (nested array schemas like
+    // `where.items.items` losing their innermost `items`).
+    if (result.type === 'ARRAY') {
+        if (!result.items || typeof result.items !== 'object') {
+            // Missing entirely, or a boolean schema like `items: true`.
+            result.items = { type: 'STRING' };
+        } else if (Array.isArray(result.items)) {
+            // Tuple-form `items: [...]` - Google only supports one items
+            // schema, so collapse to the most informative entry.
+            let best = null;
+            let bestScore = -1;
+            for (const option of result.items) {
+                const score = scoreSchemaOption(option);
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = option;
+                }
+            }
+            result.items = best || { type: 'STRING' };
+        }
     }
 
     return result;

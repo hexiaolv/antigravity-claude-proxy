@@ -35,6 +35,23 @@ function isSupportedModel(modelId) {
 }
 
 /**
+ * Whether a model id is an old Gemini generation (version below 3.5),
+ * hidden from the /v1/models listing in favor of the current line. Claude
+ * ids aren't versioned this way and are unaffected.
+ * @param {string} modelId
+ * @returns {boolean}
+ */
+function isOldGemini(modelId) {
+    // 'gemini-pro-agent' carries no version number in its id at all - it's
+    // an unversioned duplicate alias of gemini-3.1-pro-high, so it's always
+    // old regardless of what the version regex below would say.
+    if (modelId === 'gemini-pro-agent') return true;
+
+    const match = modelId.match(/^gemini-(\d+(?:\.\d+)?)/);
+    return !!match && parseFloat(match[1]) < 3.5;
+}
+
+/**
  * List available models in Anthropic API format
  * Fetches models dynamically from the Cloud Code API
  *
@@ -47,8 +64,17 @@ export async function listModels(token) {
         return { object: 'list', data: [] };
     }
 
-    const modelList = Object.entries(data.models)
-        .filter(([modelId]) => isSupportedModel(modelId))
+    const supportedEntries = Object.entries(data.models).filter(([modelId]) => isSupportedModel(modelId));
+
+    // Warm the model validation cache with every supported id, unfiltered -
+    // isValidModel() (the actual request-time gate) must keep accepting an
+    // id a client already has configured even if it's hidden from the
+    // listing below.
+    modelCache.validModels = new Set(supportedEntries.map(([modelId]) => modelId));
+    modelCache.lastFetched = Date.now();
+
+    const modelList = supportedEntries
+        .filter(([modelId]) => !isOldGemini(modelId))
         .map(([modelId, modelData]) => ({
             id: modelId,
             object: 'model',
@@ -56,10 +82,6 @@ export async function listModels(token) {
             owned_by: 'anthropic',
             description: modelData.displayName || modelId
         }));
-
-    // Warm the model validation cache
-    modelCache.validModels = new Set(modelList.map(m => m.id));
-    modelCache.lastFetched = Date.now();
 
     return {
         object: 'list',

@@ -44,16 +44,8 @@ cat > ~/.config/opencode/opencode.json <<'EOF'
       "models": {
         "claude-sonnet-4-6": { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6" },
         "claude-opus-4-6-thinking": { "id": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 Thinking" },
-        "gemini-2.5-pro": { "id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro" },
-        "gemini-2.5-flash": { "id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash" },
-        "gemini-2.5-flash-lite": { "id": "gemini-2.5-flash-lite", "name": "Gemini 2.5 Flash Lite" },
-        "gemini-2.5-flash-thinking": { "id": "gemini-2.5-flash-thinking", "name": "Gemini 2.5 Flash Thinking" },
-        "gemini-3-flash": { "id": "gemini-3-flash", "name": "Gemini 3 Flash" },
-        "gemini-3-flash-agent": { "id": "gemini-3-flash-agent", "name": "Gemini 3 Flash Agent" },
-        "gemini-pro-agent": { "id": "gemini-pro-agent", "name": "Gemini 3.1 Pro Agent" },
-        "gemini-3.1-pro-low": { "id": "gemini-3.1-pro-low", "name": "Gemini 3.1 Pro Low" },
-        "gemini-3.1-flash-lite": { "id": "gemini-3.1-flash-lite", "name": "Gemini 3.1 Flash Lite" },
-        "gemini-3.1-flash-image": { "id": "gemini-3.1-flash-image", "name": "Gemini 3.1 Flash Image" },
+        "gemini-3.8-flash-tiered": { "id": "gemini-3.8-flash-tiered", "name": "Gemini 3.8 Flash" },
+        "gemini-3.6-flash-high": { "id": "gemini-3.6-flash-high", "name": "Gemini 3.6 Flash (High)" },
         "gemini-3.5-flash-low": { "id": "gemini-3.5-flash-low", "name": "Gemini 3.5 Flash" }
       }
     }
@@ -96,16 +88,8 @@ Inside OpenCode, all registered models appear as `antigravity/<model-id>`. The `
 |---|---|---|
 | `claude-sonnet-4-6` | Claude | Coding, refactoring |
 | `claude-opus-4-6-thinking` | Claude | Architecture, deep reasoning |
-| `gemini-2.5-pro` | Gemini | Long context, analysis |
-| `gemini-2.5-flash` | Gemini | Fast general tasks |
-| `gemini-2.5-flash-lite` | Gemini | Background tasks |
-| `gemini-2.5-flash-thinking` | Gemini | Reasoning tasks |
-| `gemini-3-flash` | Gemini | Fast, lightweight |
-| `gemini-3-flash-agent` | Gemini | Agentic workflows |
-| `gemini-pro-agent` | Gemini | Agentic workflows |
-| `gemini-3.1-pro-low` | Gemini | Strong reasoning, 1M context |
-| `gemini-3.1-flash-lite` | Gemini | Lightweight tasks |
-| `gemini-3.1-flash-image` | Gemini | Vision/image tasks |
+| `gemini-3.8-flash-tiered` | Gemini | Latest Flash tier, fast general tasks |
+| `gemini-3.6-flash-high` | Gemini | Stronger reasoning, agentic workflows |
 | `gemini-3.5-flash-low` | Gemini | Fast tasks, `small_model` recommended |
 
 ## Verify Configuration

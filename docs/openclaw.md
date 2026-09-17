@@ -27,8 +27,8 @@ Add the following configuration:
         "api": "anthropic-messages",
         "models": [
           {
-            "id": "gemini-3-flash",
-            "name": "Gemini 3 Flash",
+            "id": "gemini-3.8-flash-tiered",
+            "name": "Gemini 3.8 Flash",
             "reasoning": true,
             "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
@@ -36,8 +36,8 @@ Add the following configuration:
             "maxTokens": 65536
           },
           {
-            "id": "gemini-3.1-pro-high",
-            "name": "Gemini 3.1 Pro High",
+            "id": "gemini-3.6-flash-high",
+            "name": "Gemini 3.6 Flash (High)",
             "reasoning": true,
             "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
@@ -78,11 +78,11 @@ Add the following configuration:
   "agents": {
     "defaults": {
       "model": {
-        "primary": "antigravity-proxy/gemini-3-flash",
-        "fallbacks": ["antigravity-proxy/gemini-3.1-pro-high"]
+        "primary": "antigravity-proxy/gemini-3.8-flash-tiered",
+        "fallbacks": ["antigravity-proxy/gemini-3.6-flash-high"]
       },
       "models": {
-        "antigravity-proxy/gemini-3-flash": {}
+        "antigravity-proxy/gemini-3.8-flash-tiered": {}
       }
     }
   }

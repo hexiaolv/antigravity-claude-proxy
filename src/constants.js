@@ -297,7 +297,7 @@ export const MODEL_FALLBACK_MAP = {
 // Default test models for each family (used by test suite)
 export const TEST_MODELS = {
     claude: 'claude-sonnet-4-6',
-    gemini: 'gemini-3.5-flash-low'
+    gemini: 'gemini-3.8-flash-tiered'
 };
 
 // Default Claude CLI presets (used by WebUI settings)
